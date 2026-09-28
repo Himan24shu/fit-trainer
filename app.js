@@ -310,6 +310,7 @@ function defaultState() {
     prLog: [],
     measurementLog: [],
     lastBackupAt: null,
+    readinessLog: [],
   };
 }
 
@@ -619,6 +620,43 @@ function scheduleNudgeHtml() {
   return `<div class="card nudge"><p style="margin:0;">⏰ Haven't logged today's <b>${MUSCLE_LABELS[muscle]}</b> session yet — still time to get it in.</p></div>`;
 }
 
+function todaysReadiness() {
+  return state.readinessLog.find((r) => r.date === todayStr());
+}
+
+function logReadiness(score) {
+  const date = todayStr();
+  const existing = state.readinessLog.find((r) => r.date === date);
+  if (existing) existing.score = score;
+  else state.readinessLog.push({ date, score });
+  saveState();
+  render();
+}
+
+const READINESS_LABELS = { 1: '😴 Low energy', 3: '🙂 Normal', 5: '💪 Feeling strong' };
+
+function readinessCheckinHtml() {
+  const today = todaysReadiness();
+  if (today) {
+    return `<div class="card"><p class="tiny" style="margin:0;">Today's readiness: ${READINESS_LABELS[today.score] || today.score}</p></div>`;
+  }
+  return `
+    <div class="card">
+      <h3>How are you feeling today?</h3>
+      <div class="chip-row">
+        <button class="chip" data-action="log-readiness" data-score="1">😴 Low energy</button>
+        <button class="chip" data-action="log-readiness" data-score="3">🙂 Normal</button>
+        <button class="chip" data-action="log-readiness" data-score="5">💪 Feeling strong</button>
+      </div>
+    </div>`;
+}
+
+function readinessTipHtml() {
+  const today = todaysReadiness();
+  if (!today || today.score > 1) return '';
+  return `<div class="card nudge"><p style="margin:0;">😴 You logged low energy today — consider trimming a set or two, or just matching last time's weight instead of chasing progression.</p></div>`;
+}
+
 function backupNudgeHtml() {
   const totalEntries = state.workoutLog.length + Object.values(state.dietLog).reduce((n, l) => n + l.length, 0);
   if (totalEntries < 10) return '';
@@ -686,6 +724,8 @@ function renderDashboard() {
       <p class="tiny" style="margin:0;">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''}</p>
       <p class="tiny" style="margin:4px 0 0;">${weeklyCheckinText()}</p>
     </div>
+    ${readinessCheckinHtml()}
+    ${readinessTipHtml()}
     ${scheduleNudgeHtml()}
     ${deloadBannerHtml()}
     ${backupNudgeHtml()}
@@ -765,10 +805,13 @@ function renderStrengthDay(wd, muscle) {
           <div style="flex:1;">
             <div class="row" style="align-items:flex-start;gap:6px;flex-wrap:wrap;">
               <div class="exercise-name" style="min-width:0;">${escapeHtml(ex.name)}</div>
-              <button type="button" class="link-btn" style="flex-shrink:0;white-space:nowrap;" data-action="swap-exercise" data-muscle="${muscle}" data-idx="${exIdx}" data-name="${escapeHtml(ex.name)}">🔄 Swap</button>
+              <span style="flex-shrink:0;white-space:nowrap;">
+                <button type="button" class="link-btn" data-action="voice-log" data-ex="${exIdx}">🎤</button>
+                <button type="button" class="link-btn" data-action="swap-exercise" data-muscle="${muscle}" data-idx="${exIdx}" data-name="${escapeHtml(ex.name)}">🔄 Swap</button>
+              </span>
             </div>
             <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
-            <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)}</div>
+            <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)} · <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener" style="color:var(--series-1);">▶ How to</a></div>
             ${suggestionHtml}
           </div>
         </div>
@@ -783,6 +826,46 @@ function renderStrengthDay(wd, muscle) {
       <button type="button" class="btn-secondary btn-block" style="margin-top:12px;" data-action="add-extra-exercise">+ Log something extra</button>
       <button class="btn-primary" style="margin-top:8px;" data-action="save-workout" data-weekday="${wd}" data-muscle="${muscle}">Save workout</button>
     </div>`;
+}
+
+/* Voice logging: Android Chrome supports SpeechRecognition well; iOS Safari
+   historically doesn't ship it at all, so this degrades to a toast rather than
+   a crash on unsupported browsers. */
+function startVoiceLog(exIdx) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    toast('Voice input not supported on this browser');
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+  toast('Listening… say "60 for 10"');
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    const match = transcript.match(/(\d+(?:\.\d+)?)\D+(\d+)/);
+    if (!match) {
+      toast(`Didn't catch that: "${transcript}"`);
+      return;
+    }
+    const weight = match[1];
+    const reps = match[2];
+    const weightInputs = document.querySelectorAll(`[data-ex="${exIdx}"][data-field="weight"]`);
+    const repInputs = document.querySelectorAll(`[data-ex="${exIdx}"][data-field="reps"]`);
+    let filled = false;
+    for (let i = 0; i < weightInputs.length; i++) {
+      if (!weightInputs[i].value && !repInputs[i].value) {
+        weightInputs[i].value = weight;
+        repInputs[i].value = reps;
+        filled = true;
+        break;
+      }
+    }
+    toast(filled ? `Logged ${weight} × ${reps}` : 'All sets already filled for this exercise');
+  };
+  recognition.onerror = (event) => toast(`Voice input error: ${event.error}`);
+  recognition.start();
 }
 
 function addExtraExerciseBlock() {
@@ -958,12 +1041,26 @@ function foodResultsHtml(query) {
     .join('');
 }
 
+function proteinTrendSeries(days) {
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = fmtDate(d);
+    if (state.dietLog[ds] && state.dietLog[ds].length) {
+      series.push({ date: ds, protein: Math.round(dietTotalsForDate(ds).protein) });
+    }
+  }
+  return series;
+}
+
 function renderDiet() {
   const p = state.profile;
   const targets = calcTargets(p);
   const totals = dietTotalsForDate(todayStr());
   const todayEntries = state.dietLog[todayStr()] || [];
   const mealPlan = MEAL_TEMPLATES[p.diet] || MEAL_TEMPLATES.eggetarian;
+  const proteinSeries = proteinTrendSeries(14);
   return `
     <div class="card">
       <h3>Today's totals</h3>
@@ -971,6 +1068,15 @@ function renderDiet() {
       ${meterRow('Protein', totals.protein, targets.protein, 'g')}
       ${meterRow('Carbs', totals.carbs, targets.carbs, 'g')}
       ${meterRow('Fat', totals.fat, targets.fat, 'g')}
+    </div>
+    <div class="card">
+      <h3>Protein trend (14 days)</h3>
+      ${
+        proteinSeries.length >= 2
+          ? `<div class="chart-wrap" style="position:relative;">${buildLineChartSVG(proteinSeries, 'proteinChart', 'protein')}</div>`
+          : '<p class="empty-state">Log a few more days to see your protein trend.</p>'
+      }
+      <p class="tiny">Consistency matters more than any single day for muscle gain.</p>
     </div>
     <div class="card">
       <h3>Logged today</h3>
@@ -1070,7 +1176,7 @@ function removeFoodEntry(i) {
 
 /* ---------------- Rendering: Progress ---------------- */
 
-function buildLineChartSVG(entries, idPrefix) {
+function buildLineChartSVG(entries, idPrefix, valueKey = 'weightKg') {
   const W = 320,
     H = 170,
     padL = 34,
@@ -1079,7 +1185,7 @@ function buildLineChartSVG(entries, idPrefix) {
     padB = 24;
   const innerW = W - padL - padR,
     innerH = H - padT - padB;
-  const weights = entries.map((e) => e.weightKg);
+  const weights = entries.map((e) => e[valueKey]);
   let min = Math.min(...weights),
     max = Math.max(...weights);
   if (min === max) {
@@ -1091,7 +1197,7 @@ function buildLineChartSVG(entries, idPrefix) {
   max += pad;
   const x = (i) => padL + (entries.length === 1 ? innerW / 2 : (i / (entries.length - 1)) * innerW);
   const y = (w) => padT + innerH - ((w - min) / (max - min)) * innerH;
-  const points = entries.map((e, i) => [x(i), y(e.weightKg)]);
+  const points = entries.map((e, i) => [x(i), y(e[valueKey])]);
   const pathD = points.map((pt, i) => (i === 0 ? 'M' : 'L') + pt[0].toFixed(1) + ',' + pt[1].toFixed(1)).join(' ');
   const gridLines = [0, 0.5, 1]
     .map((f) => {
@@ -1112,7 +1218,7 @@ function buildLineChartSVG(entries, idPrefix) {
     </svg>`;
 }
 
-function wireLineChart(entries, idPrefix) {
+function wireLineChart(entries, idPrefix, valueKey = 'weightKg', unitSuffix = ' kg') {
   const svg = document.getElementById(`${idPrefix}Svg`);
   if (!svg || entries.length < 2) return;
   const crosshair = document.getElementById(`${idPrefix}Crosshair`);
@@ -1161,7 +1267,7 @@ function wireLineChart(entries, idPrefix) {
     tooltip.style.left = px + 'px';
     tooltip.style.top = py + 'px';
     const e = entries[idx];
-    tooltip.textContent = `${e.date}: ${e.weightKg} kg`;
+    tooltip.textContent = `${e.date}: ${e[valueKey]}${unitSuffix}`;
   }
 
   svg.addEventListener('pointermove', handleMove);
@@ -1679,9 +1785,33 @@ async function callAssistant(userText, history) {
 
 let aiHistory = [];
 
+function localProactiveInsight() {
+  const deload = deloadSignal();
+  if (deload) {
+    return `Hey! I noticed your last ${MUSCLE_LABELS[deload.muscle]} session dropped ${deload.drop}% in volume vs the one before — want to talk through easing off this week?`;
+  }
+  const readiness = todaysReadiness();
+  if (readiness && readiness.score === 1) {
+    return "Saw you're feeling low energy today — want me to lighten today's targets a bit?";
+  }
+  if (state.prLog.length) {
+    const lastPr = state.prLog[state.prLog.length - 1];
+    if (isThisWeek(lastPr.date)) {
+      return `Nice PR this week on ${lastPr.exercise} (${lastPr.weight}kg)! What's next?`;
+    }
+  }
+  return `Hey ${state.profile.name}! Ask me to change a setting, log something, swap an exercise, or just ask a fitness question.`;
+}
+
 function openAiSheet() {
   if (!state.profile) return;
   document.getElementById('aiOverlay').classList.remove('hidden');
+  const container = document.getElementById('aiMessages');
+  if (!container.children.length) {
+    const greeting = localProactiveInsight();
+    appendAiMessage('assistant', greeting);
+    aiHistory.push({ role: 'model', text: greeting });
+  }
   document.getElementById('aiInput').focus();
 }
 
@@ -1727,6 +1857,7 @@ function render() {
     app.innerHTML = renderWorkout();
   } else if (currentTab === 'diet') {
     app.innerHTML = renderDiet();
+    wireLineChart(proteinTrendSeries(14), 'proteinChart', 'protein', 'g');
   } else if (currentTab === 'progress') {
     app.innerHTML = renderProgress();
     const entries = [...state.weightLog].sort((a, b) => a.date.localeCompare(b.date));
@@ -1795,6 +1926,10 @@ function handleAppClick(e) {
     saveState();
     toast('Session deleted');
     render();
+  } else if (action === 'voice-log') {
+    startVoiceLog(Number(btn.dataset.ex));
+  } else if (action === 'log-readiness') {
+    logReadiness(Number(btn.dataset.score));
   } else if (action === 'log-meal-slot') {
     addFoodEntry({
       name: `${btn.dataset.slot} (plan)`,
