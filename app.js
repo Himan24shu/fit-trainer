@@ -288,13 +288,14 @@ function exIconSVG(pattern) {
 /* ---------------- State ---------------- */
 
 function defaultState() {
-  return { profile: null, weightLog: [], workoutLog: [], dietLog: {}, activeWeekday: null };
+  return { profile: null, weightLog: [], workoutLog: [], dietLog: {}, activeWeekday: null, exerciseOverrides: {} };
 }
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? JSON.parse(raw) : defaultState();
+    const parsed = raw ? JSON.parse(raw) : defaultState();
+    return { ...defaultState(), ...parsed };
   } catch (e) {
     return defaultState();
   }
@@ -409,6 +410,29 @@ function latestWeight() {
   return state.weightLog[state.weightLog.length - 1].weightKg;
 }
 
+function getStrengthTemplate(muscle, experience) {
+  const base = STRENGTH_TEMPLATES[muscle][experience];
+  const overrides = (state.exerciseOverrides[muscle] && state.exerciseOverrides[muscle][experience]) || {};
+  return base.map((ex) => overrides[ex.name] || ex);
+}
+
+function inferPattern(name) {
+  const n = name.toLowerCase();
+  if (/curl/.test(n)) return 'curl';
+  if (/(pushdown|skull|kickback|triceps ext)/.test(n)) return 'extension';
+  if (/push-?up/.test(n)) return 'pushup';
+  if (/dip/.test(n)) return 'dip';
+  if (/(bench|fly|chest press)/.test(n)) return 'bench';
+  if (/(row|pull-?over)/.test(n)) return 'pull';
+  if (/(pulldown|pull-?up|chin-?up)/.test(n)) return 'vpull';
+  if (/(overhead|shoulder press|arnold)/.test(n)) return 'vpress';
+  if (/(lateral|front raise|rear delt|face pull|shrug)/.test(n)) return 'raise';
+  if (/(deadlift|rdl|romanian|good morning)/.test(n)) return 'hinge';
+  if (/(squat|lunge|leg press|calf|leg curl|leg extension)/.test(n)) return 'squat';
+  if (/(plank|crunch|sit-?up|leg raise)/.test(n)) return 'core';
+  return undefined;
+}
+
 function lastExercisePerformance(name) {
   for (let i = state.workoutLog.length - 1; i >= 0; i--) {
     const s = state.workoutLog[i];
@@ -489,7 +513,7 @@ function renderDashboard() {
         </ul>
       </div>`;
   } else {
-    const list = STRENGTH_TEMPLATES[muscle][p.experience];
+    const list = getStrengthTemplate(muscle, p.experience);
     workoutCard = `
       <div class="card">
         <div class="row"><h3 style="margin:0;">Today — ${MUSCLE_LABELS[muscle]}</h3><button class="btn-secondary" data-action="go-workout">Start</button></div>
@@ -551,7 +575,7 @@ function renderWorkout() {
 
 function renderStrengthDay(wd, muscle) {
   const p = state.profile;
-  const template = STRENGTH_TEMPLATES[muscle][p.experience];
+  const template = getStrengthTemplate(muscle, p.experience);
   const exercisesHtml = template
     .map((ex, exIdx) => {
       const last = lastExercisePerformance(ex.name);
@@ -641,7 +665,7 @@ function workoutHistoryHtml() {
 }
 
 function saveWorkout(weekday, muscle) {
-  const template = STRENGTH_TEMPLATES[muscle][state.profile.experience];
+  const template = getStrengthTemplate(muscle, state.profile.experience);
   const exercises = template
     .map((ex, exIdx) => {
       const sets = [];
@@ -968,6 +992,16 @@ function renderSettings() {
       </form>
     </div>
     <div class="card">
+      <h3>AI Assistant</h3>
+      <p class="tiny">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/app/apikey</b> (no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
+      <form id="aiKeyForm">
+        <input type="password" name="geminiKey" placeholder="Paste your Gemini API key" value="${escapeHtml(getGeminiKey())}" />
+        <button type="submit" class="btn-secondary btn-block" style="margin-top:8px;">Save key</button>
+      </form>
+      ${getGeminiKey() ? '<p class="tiny" style="margin-top:8px;">Key saved — the assistant is ready.</p>' : ''}
+      ${Object.keys(state.exerciseOverrides).length ? '<button class="btn-secondary btn-block" style="margin-top:8px;" data-action="clear-overrides">Clear AI exercise swaps</button>' : ''}
+    </div>
+    <div class="card">
       <h3>Your data</h3>
       <p class="tiny">Everything is stored only on this device (browser local storage). Nothing is sent anywhere.</p>
       <button class="btn-secondary btn-block" data-action="export-data" style="margin-bottom:8px;">Export backup (JSON)</button>
@@ -1022,6 +1056,291 @@ function resetData() {
   document.getElementById('onboardingOverlay').classList.remove('hidden');
 }
 
+/* ---------------- AI Assistant ----------------
+   Bring-your-own-key: the free Gemini API is the only way to get a real model
+   into a static, no-backend, no-cost page. The key lives only in this device's
+   localStorage and is sent only to Google, directly from the browser, when the
+   user sends a chat message. The model can act on the app via function calling
+   instead of just talking about it — each tool below maps to a real state
+   mutation the app already exposes through its own UI. */
+
+const GEMINI_KEY_STORAGE = 'fittrainer_gemini_key';
+const GEMINI_MODEL = 'gemini-2.0-flash';
+
+function getGeminiKey() {
+  return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+}
+
+function setGeminiKey(key) {
+  if (key) localStorage.setItem(GEMINI_KEY_STORAGE, key);
+  else localStorage.removeItem(GEMINI_KEY_STORAGE);
+}
+
+const AI_TOOLS = [
+  {
+    name: 'update_profile',
+    description: "Update the user's profile: body weight, height, age, sex, activity level, fitness goal, diet preference, or gym experience level. Only include fields the user actually wants changed.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        weightKg: { type: 'NUMBER', description: 'Body weight in kg' },
+        heightCm: { type: 'NUMBER' },
+        age: { type: 'NUMBER' },
+        sex: { type: 'STRING', enum: ['male', 'female', 'other'] },
+        activityLevel: { type: 'STRING', enum: ['sedentary', 'light', 'moderate', 'active'] },
+        goal: { type: 'STRING', enum: ['fat_loss', 'muscle_gain', 'general'] },
+        diet: { type: 'STRING', enum: ['vegetarian', 'eggetarian', 'non_veg', 'vegan'] },
+        experience: { type: 'STRING', enum: ['beginner', 'intermediate', 'advanced'] },
+      },
+    },
+  },
+  {
+    name: 'log_weight',
+    description: "Log the user's body weight for today.",
+    parameters: { type: 'OBJECT', properties: { weightKg: { type: 'NUMBER' } }, required: ['weightKg'] },
+  },
+  {
+    name: 'add_food',
+    description: "Add a food entry to today's diet log. Estimate reasonable nutrition values yourself (Indian home cooking, e.g. dal/chawal/roti/egg style) if the user doesn't give exact numbers.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        name: { type: 'STRING' },
+        cal: { type: 'NUMBER', description: 'Calories for one serving' },
+        protein: { type: 'NUMBER', description: 'Grams of protein for one serving' },
+        carbs: { type: 'NUMBER', description: 'Grams of carbs for one serving' },
+        fat: { type: 'NUMBER', description: 'Grams of fat for one serving' },
+        qty: { type: 'NUMBER', description: 'How many servings, defaults to 1' },
+      },
+      required: ['name', 'cal', 'protein', 'carbs', 'fat'],
+    },
+  },
+  {
+    name: 'remove_last_food',
+    description: "Remove a food entry from today's diet log — the most recent one, or a named one if the user specifies it.",
+    parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } } },
+  },
+  {
+    name: 'log_cardio_minutes',
+    description: 'Log minutes of cardio the user did today.',
+    parameters: { type: 'OBJECT', properties: { minutes: { type: 'NUMBER' } }, required: ['minutes'] },
+  },
+  {
+    name: 'replace_exercise',
+    description: "Swap one exercise in the user's weekly workout plan for a different one, for a given muscle-group day. Applies to their current experience level.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        muscle: { type: 'STRING', enum: ['chest', 'back', 'shoulders', 'arms', 'legs'] },
+        originalName: { type: 'STRING', description: 'The exact existing exercise name to replace' },
+        newName: { type: 'STRING' },
+        sets: { type: 'NUMBER' },
+        reps: { type: 'STRING', description: 'e.g. "10-12" or "8"' },
+      },
+      required: ['muscle', 'originalName', 'newName'],
+    },
+  },
+  {
+    name: 'navigate',
+    description: 'Switch the app to a different screen.',
+    parameters: {
+      type: 'OBJECT',
+      properties: { tab: { type: 'STRING', enum: ['dashboard', 'workout', 'diet', 'progress', 'settings'] } },
+      required: ['tab'],
+    },
+  },
+];
+
+function toolUpdateProfile(fields) {
+  const numeric = ['weightKg', 'heightCm', 'age'];
+  const allowed = ['weightKg', 'heightCm', 'age', 'sex', 'activityLevel', 'goal', 'diet', 'experience'];
+  const changed = [];
+  allowed.forEach((k) => {
+    if (fields[k] === undefined || fields[k] === null || fields[k] === '') return;
+    state.profile[k] = numeric.includes(k) ? Number(fields[k]) : fields[k];
+    changed.push(k);
+  });
+  if (!changed.length) return "I didn't see a profile field to change there.";
+  saveState();
+  render();
+  return `Updated your ${changed.join(', ')}.`;
+}
+
+function toolLogWeight({ weightKg }) {
+  if (!weightKg) return 'I need a weight in kg to log.';
+  logWeight(Number(weightKg));
+  return `Logged today's weight as ${weightKg} kg.`;
+}
+
+function toolAddFood({ name, cal, protein, carbs, fat, qty }) {
+  if (!name) return "I need a food name to log.";
+  const item = { name, cal: Number(cal) || 0, protein: Number(protein) || 0, carbs: Number(carbs) || 0, fat: Number(fat) || 0 };
+  const count = qty && qty > 0 ? Math.round(qty) : 1;
+  for (let i = 0; i < count; i++) addFoodEntry(item);
+  return `Added ${name}${count > 1 ? ' × ' + count : ''} to today's diet log.`;
+}
+
+function toolRemoveLastFood({ name }) {
+  const list = state.dietLog[todayStr()] || [];
+  if (!list.length) return "There's nothing logged today to remove.";
+  let idx = list.length - 1;
+  if (name) {
+    const found = list.findIndex((e) => e.name.toLowerCase().includes(String(name).toLowerCase()));
+    if (found === -1) return `I couldn't find "${name}" in today's log.`;
+    idx = found;
+  }
+  const entryName = list[idx].name;
+  removeFoodEntry(idx);
+  return `Removed one ${entryName} from today's log.`;
+}
+
+function toolLogCardio({ minutes }) {
+  if (!minutes) return 'I need a number of minutes to log.';
+  state.workoutLog.push({
+    date: todayStr(),
+    weekday: todayWeekday(),
+    muscle: 'cardio',
+    activities: [{ activity: 'Cardio (via assistant)', minutes: Number(minutes) }],
+  });
+  saveState();
+  render();
+  return `Logged ${minutes} minutes of cardio for today.`;
+}
+
+function toolReplaceExercise({ muscle, originalName, newName, sets, reps }) {
+  const experience = state.profile.experience;
+  const base = STRENGTH_TEMPLATES[muscle] && STRENGTH_TEMPLATES[muscle][experience];
+  if (!base) return `I couldn't find a ${muscle} plan to edit.`;
+  const current = getStrengthTemplate(muscle, experience);
+  const matchIdx = current.findIndex((ex) => ex.name.toLowerCase() === String(originalName).toLowerCase());
+  if (matchIdx === -1) return `I couldn't find "${originalName}" on your ${MUSCLE_LABELS[muscle]} day.`;
+  const original = current[matchIdx];
+  const baseName = base[matchIdx].name; // getStrengthTemplate preserves index order, so this is the un-overridden slot name
+  if (!state.exerciseOverrides[muscle]) state.exerciseOverrides[muscle] = {};
+  if (!state.exerciseOverrides[muscle][experience]) state.exerciseOverrides[muscle][experience] = {};
+  state.exerciseOverrides[muscle][experience][baseName] = {
+    name: newName,
+    sets: sets ? Number(sets) : original.sets,
+    reps: reps || original.reps,
+    pattern: inferPattern(newName),
+    cue: original.cue,
+  };
+  saveState();
+  render();
+  return `Swapped ${original.name} for ${newName} on your ${MUSCLE_LABELS[muscle]} day.`;
+}
+
+function toolNavigate({ tab }) {
+  const valid = ['dashboard', 'workout', 'diet', 'progress', 'settings'];
+  if (!valid.includes(tab)) return "I don't know that screen.";
+  currentTab = tab;
+  render();
+  return `Switched to ${tab}.`;
+}
+
+const AI_TOOL_HANDLERS = {
+  update_profile: toolUpdateProfile,
+  log_weight: toolLogWeight,
+  add_food: toolAddFood,
+  remove_last_food: toolRemoveLastFood,
+  log_cardio_minutes: toolLogCardio,
+  replace_exercise: toolReplaceExercise,
+  navigate: toolNavigate,
+};
+
+function aiSystemInstruction() {
+  const p = state.profile;
+  const wd = todayWeekday();
+  const muscle = WEEKDAY_MUSCLE[wd];
+  return `You are the in-app assistant for FitTrainer, a personal workout and diet tracker.
+Current profile: ${JSON.stringify(p)}.
+Today is ${WEEKDAY_LABELS[wd]}, so today's scheduled focus is ${MUSCLE_LABELS[muscle]}.
+Call one of the provided functions whenever the user clearly asks to change a setting, log food/weight/cardio, or swap an exercise.
+If the user is just asking a question (form tips, how many sets, general advice), answer briefly in plain text and do not call a function.
+Keep replies short, friendly, and conversational — a sentence or two.`;
+}
+
+async function callAssistant(userText, history) {
+  const apiKey = getGeminiKey();
+  if (!apiKey) {
+    return { text: 'Add a free Gemini API key in Settings → AI Assistant to turn this on.' };
+  }
+  const contents = [...history.map((h) => ({ role: h.role, parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: userText }] }];
+  const body = {
+    contents,
+    systemInstruction: { parts: [{ text: aiSystemInstruction() }] },
+    tools: [{ functionDeclarations: AI_TOOLS }],
+  };
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`Gemini API error ${res.status}: ${errText.slice(0, 180)}`);
+  }
+  const data = await res.json();
+  const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+  const results = [];
+  let textReply = '';
+  for (const part of parts) {
+    if (part.functionCall) {
+      const handler = AI_TOOL_HANDLERS[part.functionCall.name];
+      if (handler) {
+        try {
+          results.push(handler(part.functionCall.args || {}));
+        } catch (err) {
+          results.push('Something went wrong making that change.');
+        }
+      }
+    } else if (part.text) {
+      textReply += part.text;
+    }
+  }
+  return { text: results.length ? results.join(' ') : textReply || 'Done.' };
+}
+
+let aiHistory = [];
+
+function openAiSheet() {
+  if (!state.profile) return;
+  document.getElementById('aiOverlay').classList.remove('hidden');
+  document.getElementById('aiInput').focus();
+}
+
+function appendAiMessage(role, text) {
+  const el = document.createElement('div');
+  el.className = `ai-msg ${role === 'user' ? 'user' : 'assistant'}`;
+  el.textContent = text;
+  const container = document.getElementById('aiMessages');
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+async function handleAiSubmit(e) {
+  e.preventDefault();
+  const input = document.getElementById('aiInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  appendAiMessage('user', text);
+  const pending = appendAiMessage('assistant', 'Thinking…');
+  pending.classList.add('pending');
+  try {
+    const { text: reply } = await callAssistant(text, aiHistory);
+    pending.textContent = reply;
+    pending.classList.remove('pending');
+    aiHistory.push({ role: 'user', text });
+    aiHistory.push({ role: 'model', text: reply });
+    if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
+  } catch (err) {
+    pending.textContent = `Couldn't reach the AI: ${err.message}`;
+    pending.classList.remove('pending');
+  }
+}
+
 /* ---------------- Main render dispatcher ---------------- */
 
 function render() {
@@ -1069,6 +1388,11 @@ function handleAppClick(e) {
     exportData();
   } else if (action === 'reset-data') {
     resetData();
+  } else if (action === 'clear-overrides') {
+    state.exerciseOverrides = {};
+    saveState();
+    toast('Exercise swaps cleared');
+    render();
   }
 }
 
@@ -1098,6 +1422,12 @@ function handleAppSubmit(e) {
   } else if (e.target.id === 'settingsForm') {
     e.preventDefault();
     saveSettingsForm(e.target);
+  } else if (e.target.id === 'aiKeyForm') {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    setGeminiKey(fd.get('geminiKey').trim());
+    toast('Saved');
+    render();
   }
 }
 
@@ -1110,7 +1440,7 @@ function handleAppChange(e) {
       try {
         const imported = JSON.parse(reader.result);
         if (!imported.profile) throw new Error('missing profile');
-        state = imported;
+        state = { ...defaultState(), ...imported };
         saveState();
         toast('Data imported');
         render();
@@ -1171,6 +1501,12 @@ function init() {
   });
 
   document.getElementById('onboardingForm').addEventListener('submit', handleOnboardingSubmit);
+
+  document.getElementById('aiFab').addEventListener('click', openAiSheet);
+  document.getElementById('aiCloseBtn').addEventListener('click', () => {
+    document.getElementById('aiOverlay').classList.add('hidden');
+  });
+  document.getElementById('aiForm').addEventListener('submit', handleAiSubmit);
 
   if (!state.profile) {
     document.getElementById('onboardingOverlay').classList.remove('hidden');

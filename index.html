@@ -103,6 +103,23 @@
   </div>
 </div>
 
+<button id="aiFab" class="ai-fab" aria-label="AI Assistant">💬</button>
+
+<div id="aiOverlay" class="overlay hidden">
+  <div class="sheet ai-sheet">
+    <div class="row" style="margin-bottom:4px;">
+      <h1 style="margin:0;">AI Assistant</h1>
+      <button type="button" class="link-btn" id="aiCloseBtn">Close</button>
+    </div>
+    <p class="tiny" style="margin:0 0 8px;">Ask it to change a setting, log food or weight, swap an exercise, or just answer a fitness question.</p>
+    <div id="aiMessages" class="ai-messages"></div>
+    <form id="aiForm" class="row" style="gap:8px;">
+      <input type="text" id="aiInput" placeholder="e.g. change my goal to fat loss" style="flex:1;" autocomplete="off" />
+      <button type="submit" class="btn-primary" style="width:auto;">Send</button>
+    </form>
+  </div>
+</div>
+
 <script src="app.js"></script>
 </body>
 </html>

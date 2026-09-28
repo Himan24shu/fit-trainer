@@ -294,4 +294,35 @@ svg.chart .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dashar
 
 .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
 .nudge { background: var(--surface-2); border: 1px dashed var(--border); }
+
+/* ---- AI Assistant ---- */
+.ai-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--series-1);
+  color: #fff;
+  border: none;
+  font-size: 22px;
+  box-shadow: 0 2px 10px rgba(11, 11, 11, 0.3);
+  z-index: 50;
+  cursor: pointer;
+}
+.ai-sheet { display: flex; flex-direction: column; max-height: 85vh; }
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  margin: 4px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 180px;
+}
+.ai-msg { max-width: 85%; padding: 8px 12px; border-radius: 14px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
+.ai-msg.user { align-self: flex-end; background: var(--series-1); color: #fff; }
+.ai-msg.assistant { align-self: flex-start; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); }
+.ai-msg.pending { opacity: 0.6; }
 .link-btn { background: none; border: none; color: var(--series-1); font-weight: 600; cursor: pointer; padding: 0; font-family: inherit; font-size: 14px; }
