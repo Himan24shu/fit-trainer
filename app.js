@@ -158,6 +158,16 @@ const FOOD_DB = [
   { name: 'Banana', unit: '1', cal: 105, protein: 1.3, carbs: 27, fat: 0.4 },
 ];
 
+const EATING_OUT_PRESETS = [
+  { name: 'Restaurant thali (veg)', unit: '1', cal: 750, protein: 20, carbs: 100, fat: 28 },
+  { name: 'Dhaba-style meal (dal + roti + sabzi)', unit: '1', cal: 650, protein: 18, carbs: 90, fat: 20 },
+  { name: 'Restaurant paneer curry + rice/naan', unit: '1', cal: 850, protein: 25, carbs: 95, fat: 38 },
+  { name: 'Biryani (veg or egg)', unit: '1 plate', cal: 600, protein: 15, carbs: 85, fat: 20 },
+  { name: 'Restaurant egg curry + rice/roti', unit: '1', cal: 700, protein: 28, carbs: 80, fat: 28 },
+  { name: 'Airport/travel sandwich + coffee', unit: '1', cal: 450, protein: 12, carbs: 55, fat: 18 },
+  { name: 'Restaurant omelette + toast', unit: '1', cal: 400, protein: 20, carbs: 30, fat: 20 },
+];
+
 const MEAL_TEMPLATES = {
   vegetarian: [
     ['Breakfast', 'Paneer bhurji with 2 roti, or milk with a fruit'],
@@ -416,6 +426,25 @@ function getStrengthTemplate(muscle, experience) {
   return base.map((ex) => overrides[ex.name] || ex);
 }
 
+/* In-workout exercise swap: session-only, not persisted — for "the bench is
+   taken right now," not a permanent plan change (that's what exerciseOverrides,
+   editable via the AI assistant, is for). Resets on reload by design. */
+let sessionSwaps = {};
+
+function alternateExercisesFor(muscle, excludeName) {
+  const seen = new Map();
+  ['beginner', 'intermediate', 'advanced'].forEach((tier) => {
+    STRENGTH_TEMPLATES[muscle][tier].forEach((ex) => {
+      if (ex.name !== excludeName && !seen.has(ex.name)) seen.set(ex.name, ex);
+    });
+  });
+  return [...seen.values()];
+}
+
+function getDisplayTemplate(muscle, experience) {
+  return getStrengthTemplate(muscle, experience).map((ex, i) => sessionSwaps[`${muscle}:${i}`] || ex);
+}
+
 function inferPattern(name) {
   const n = name.toLowerCase();
   if (/curl/.test(n)) return 'curl';
@@ -513,6 +542,71 @@ function meterRow(label, value, target, unit) {
     </div>`;
 }
 
+function sessionVolume(session) {
+  if (!session.exercises) return 0;
+  return session.exercises.reduce((sum, ex) => sum + ex.sets.reduce((s, set) => s + (set.weight || 0) * (set.reps || 0), 0), 0);
+}
+
+/* Deload signal: if a muscle's most recent logged session dropped >15% in total
+   volume vs the one before it, that's fatigue/regression worth backing off for,
+   not just pushing through. */
+function deloadSignal() {
+  const flags = [];
+  ['chest', 'back', 'shoulders', 'arms', 'legs'].forEach((muscle) => {
+    const sessions = state.workoutLog.filter((s) => s.muscle === muscle);
+    if (sessions.length < 2) return;
+    const last = sessions[sessions.length - 1];
+    const prev = sessions[sessions.length - 2];
+    const lastVol = sessionVolume(last);
+    const prevVol = sessionVolume(prev);
+    if (prevVol > 0 && lastVol < prevVol * 0.85) {
+      flags.push({ muscle, date: last.date, drop: Math.round((1 - lastVol / prevVol) * 100) });
+    }
+  });
+  if (!flags.length) return null;
+  flags.sort((a, b) => b.date.localeCompare(a.date));
+  return flags[0];
+}
+
+function deloadBannerHtml() {
+  const signal = deloadSignal();
+  if (!signal) return '';
+  return `<div class="card nudge"><p style="margin:0;">⚠️ Your last <b>${MUSCLE_LABELS[signal.muscle]}</b> session dropped ${signal.drop}% in total volume vs the one before. Might be worth a lighter week or an extra rest day before pushing again.</p></div>`;
+}
+
+function weeklyCheckinText() {
+  const weekCount = state.workoutLog.filter((s) => isThisWeek(s.date)).length;
+  const entries = [...state.weightLog].sort((a, b) => a.date.localeCompare(b.date));
+  let weightPart = '';
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = fmtDate(weekAgo);
+  const recentEntries = entries.filter((e) => e.date >= weekAgoStr);
+  if (recentEntries.length >= 2) {
+    const change = (recentEntries[recentEntries.length - 1].weightKg - recentEntries[0].weightKg).toFixed(1);
+    weightPart = ` · weight ${change > 0 ? '+' : ''}${change} kg this week`;
+  }
+  return `${weekCount}/6 sessions this week${weightPart}`;
+}
+
+/* Schedule-aware nudge, purely on-open (no push notifications — that needs a
+   backend to trigger while the app is closed, which would break the free/no-server
+   model). If today's a scheduled lifting day, it's evening, and nothing's logged
+   yet, say so once when the app is opened. */
+function shouldNudgeToday() {
+  const wd = todayWeekday();
+  const muscle = WEEKDAY_MUSCLE[wd];
+  if (muscle === 'rest') return false;
+  if (state.workoutLog.some((s) => s.date === todayStr())) return false;
+  return new Date().getHours() >= 18;
+}
+
+function scheduleNudgeHtml() {
+  if (!shouldNudgeToday()) return '';
+  const muscle = WEEKDAY_MUSCLE[todayWeekday()];
+  return `<div class="card nudge"><p style="margin:0;">⏰ Haven't logged today's <b>${MUSCLE_LABELS[muscle]}</b> session yet — still time to get it in.</p></div>`;
+}
+
 function levelUpNudgeHtml() {
   const p = state.profile;
   if (p.experience === 'advanced') return '';
@@ -565,7 +659,10 @@ function renderDashboard() {
       <h2 style="margin-bottom:4px;">Hi ${escapeHtml(p.name)} 👋</h2>
       <p class="muted" style="margin:0 0 4px;">${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       <p class="tiny" style="margin:0;">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''}</p>
+      <p class="tiny" style="margin:4px 0 0;">${weeklyCheckinText()}</p>
     </div>
+    ${scheduleNudgeHtml()}
+    ${deloadBannerHtml()}
     ${levelUpNudgeHtml()}
     <div class="card">
       <h3>Today's targets</h3>
@@ -612,7 +709,7 @@ function renderWorkout() {
 
 function renderStrengthDay(wd, muscle) {
   const p = state.profile;
-  const template = getStrengthTemplate(muscle, p.experience);
+  const template = getDisplayTemplate(muscle, p.experience);
   const exercisesHtml = template
     .map((ex, exIdx) => {
       const last = lastExercisePerformance(ex.name);
@@ -640,7 +737,10 @@ function renderStrengthDay(wd, muscle) {
         <div class="row" style="align-items:flex-start;gap:10px;">
           <div class="ex-icon-wrap">${exIconSVG(ex.pattern)}</div>
           <div style="flex:1;">
-            <div class="exercise-name">${escapeHtml(ex.name)}</div>
+            <div class="row" style="align-items:flex-start;gap:6px;flex-wrap:wrap;">
+              <div class="exercise-name" style="min-width:0;">${escapeHtml(ex.name)}</div>
+              <button type="button" class="link-btn" style="flex-shrink:0;white-space:nowrap;" data-action="swap-exercise" data-muscle="${muscle}" data-idx="${exIdx}" data-name="${escapeHtml(ex.name)}">🔄 Swap</button>
+            </div>
             <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
             <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)}</div>
             ${suggestionHtml}
@@ -756,7 +856,7 @@ function workoutHistoryHtml() {
 }
 
 function saveWorkout(weekday, muscle) {
-  const template = getStrengthTemplate(muscle, state.profile.experience);
+  const template = getDisplayTemplate(muscle, state.profile.experience);
   const exercises = template
     .map((ex, exIdx) => {
       const sets = [];
@@ -777,6 +877,9 @@ function saveWorkout(weekday, muscle) {
   }
   state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises: allExercises });
   state.activeWeekday = null;
+  Object.keys(sessionSwaps).forEach((key) => {
+    if (key.startsWith(`${muscle}:`)) delete sessionSwaps[key];
+  });
   saveState();
   toast('Workout saved 💪');
   render();
@@ -866,6 +969,17 @@ function renderDiet() {
       </form>
     </div>
     <div class="card">
+      <h3>Eating out / travelling?</h3>
+      <p class="tiny">Rough estimates for when you can't control the kitchen — log the closest match.</p>
+      ${EATING_OUT_PRESETS.map(
+        (f) => `
+      <div class="food-item">
+        <span>${escapeHtml(f.name)} <span class="tiny">(~${f.cal} kcal)</span></span>
+        <button class="btn-secondary" data-action="add-food" data-name="${escapeHtml(f.name)}">+</button>
+      </div>`
+      ).join('')}
+    </div>
+    <div class="card">
       <h3>Suggested meal plan — ${DIET_LABELS[p.diet]}</h3>
       <p class="tiny">Scale portions to hit the totals above. This is a starting template, not a prescription.</p>
       ${mealPlan.map(([slot, desc]) => `<div class="log-entry"><span>${slot}</span><span class="tiny" style="text-align:right;max-width:65%;">${desc}</span></div>`).join('')}
@@ -874,7 +988,7 @@ function renderDiet() {
 }
 
 function addFoodByName(name) {
-  const item = FOOD_DB.find((f) => f.name === name);
+  const item = FOOD_DB.find((f) => f.name === name) || EATING_OUT_PRESETS.find((f) => f.name === name);
   if (!item) return;
   addFoodEntry(item);
 }
@@ -1485,6 +1599,18 @@ function handleAppClick(e) {
   } else if (action === 'remove-extra') {
     const block = btn.closest('[data-extra-block]');
     if (block) block.remove();
+  } else if (action === 'swap-exercise') {
+    const muscle = btn.dataset.muscle;
+    const idx = Number(btn.dataset.idx);
+    const alternates = alternateExercisesFor(muscle, btn.dataset.name);
+    if (!alternates.length) {
+      toast('No alternate exercise available for this slot');
+    } else {
+      const next = alternates[Math.floor(Math.random() * alternates.length)];
+      sessionSwaps[`${muscle}:${idx}`] = next;
+      toast(`Swapped in ${next.name} for today`);
+      render();
+    }
   } else if (action === 'clear-overrides') {
     state.exerciseOverrides = {};
     saveState();
