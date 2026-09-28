@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittrainer-v2';
+const CACHE_NAME = 'fittrainer-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -25,18 +25,18 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+/* Network-first: always try to fetch the latest file when online, and only fall
+   back to the cached copy when offline. A cache-first strategy here would serve
+   stale app code indefinitely after every future deploy, not just this one. */
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          return response;
-        })
-        .catch(() => cached);
-    })
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
