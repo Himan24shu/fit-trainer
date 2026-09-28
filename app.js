@@ -146,119 +146,99 @@ const CARDIO_TEMPLATES = {
 };
 
 const FOOD_DB = [
-  { name: 'Egg, whole (boiled)', unit: '1 egg', cal: 78, protein: 6.3, carbs: 0.6, fat: 5.3 },
-  { name: 'Egg white', unit: '1', cal: 17, protein: 3.6, carbs: 0.2, fat: 0.1 },
-  { name: 'Paneer', unit: '100g', cal: 265, protein: 18, carbs: 1.2, fat: 20 },
-  { name: 'Tofu, firm', unit: '100g', cal: 76, protein: 8, carbs: 1.9, fat: 4.3 },
-  { name: 'Milk, toned', unit: '250ml', cal: 120, protein: 6.5, carbs: 9.5, fat: 5 },
-  { name: 'Curd / yogurt', unit: '100g', cal: 60, protein: 3.5, carbs: 4.7, fat: 3.3 },
-  { name: 'Greek yogurt', unit: '100g', cal: 59, protein: 10, carbs: 3.6, fat: 0.4 },
-  { name: 'Whey protein', unit: '1 scoop', cal: 120, protein: 24, carbs: 3, fat: 1.5 },
   { name: 'Roti / chapati', unit: '1', cal: 85, protein: 3, carbs: 15, fat: 1.5 },
-  { name: 'Rice, cooked', unit: '1 cup', cal: 205, protein: 4.3, carbs: 45, fat: 0.4 },
+  { name: 'Rice, cooked (chawal)', unit: '1 cup', cal: 205, protein: 4.3, carbs: 45, fat: 0.4 },
   { name: 'Dal, cooked', unit: '1 cup', cal: 198, protein: 12, carbs: 30, fat: 4 },
-  { name: 'Rajma / chole, cooked', unit: '1 cup', cal: 220, protein: 12, carbs: 35, fat: 3 },
-  { name: 'Soya chunks (dry)', unit: '50g', cal: 173, protein: 26, carbs: 15, fat: 0.7 },
-  { name: 'Peanut butter', unit: '1 tbsp', cal: 95, protein: 4, carbs: 3, fat: 8 },
-  { name: 'Almonds', unit: '10 nuts', cal: 70, protein: 2.5, carbs: 2.5, fat: 6 },
-  { name: 'Peanuts', unit: '30g', cal: 170, protein: 7, carbs: 6, fat: 14 },
-  { name: 'Banana', unit: '1 medium', cal: 105, protein: 1.3, carbs: 27, fat: 0.4 },
-  { name: 'Apple', unit: '1 medium', cal: 95, protein: 0.5, carbs: 25, fat: 0.3 },
-  { name: 'Oats (dry)', unit: '50g', cal: 190, protein: 6.7, carbs: 33, fat: 3.5 },
-  { name: 'Poha, cooked', unit: '1 plate', cal: 270, protein: 5, carbs: 55, fat: 4 },
-  { name: 'Idli', unit: '2 pieces', cal: 78, protein: 2.4, carbs: 16, fat: 0.4 },
-  { name: 'Sambhar', unit: '1 cup', cal: 140, protein: 6, carbs: 20, fat: 4 },
+  { name: 'Egg, boiled', unit: '1', cal: 78, protein: 6.3, carbs: 0.6, fat: 5.3 },
+  { name: 'Egg bhurji / curry (2 eggs)', unit: '1 serving', cal: 180, protein: 13, carbs: 4, fat: 12 },
+  { name: 'Curd / yogurt', unit: '100g', cal: 60, protein: 3.5, carbs: 4.7, fat: 3.3 },
+  { name: 'Milk', unit: '250ml', cal: 120, protein: 6.5, carbs: 9.5, fat: 5 },
   { name: 'Mixed veg sabzi', unit: '1 cup', cal: 120, protein: 3, carbs: 15, fat: 6 },
-  { name: 'Sweet potato, boiled', unit: '100g', cal: 86, protein: 1.6, carbs: 20, fat: 0.1 },
-  { name: 'Ghee', unit: '1 tsp', cal: 45, protein: 0, carbs: 0, fat: 5 },
+  { name: 'Paneer', unit: '100g', cal: 265, protein: 18, carbs: 1.2, fat: 20 },
+  { name: 'Banana', unit: '1', cal: 105, protein: 1.3, carbs: 27, fat: 0.4 },
 ];
 
 const MEAL_TEMPLATES = {
   vegetarian: [
-    ['Early morning', 'Soaked almonds + walnuts, water'],
-    ['Breakfast', 'Paneer bhurji or besan chilla, 2 multigrain toast, milk'],
-    ['Mid-morning', 'Greek yogurt or curd with fruit'],
-    ['Lunch', '2 roti + rice, dal, paneer/soya curry, salad, curd'],
-    ['Pre-workout', 'Banana + black coffee'],
-    ['Post-workout', 'Whey protein shake or paneer + fruit'],
-    ['Dinner', 'Tofu/paneer curry, roti or rice, sabzi, salad'],
-    ['Before bed', 'Warm milk'],
+    ['Breakfast', 'Paneer bhurji with 2 roti, or milk with a fruit'],
+    ['Lunch', 'Dal, chawal (rice), 2 roti, sabzi, curd'],
+    ['Snack', 'Curd or a banana'],
+    ['Dinner', 'Dal, 2 roti or chawal, sabzi, curd'],
   ],
   eggetarian: [
-    ['Early morning', 'Soaked almonds + walnuts, water'],
-    ['Breakfast', '3 whole eggs + 1 egg white omelette with veggies, 2 multigrain toast, milk'],
-    ['Mid-morning', 'Greek yogurt or paneer bhurji, fruit'],
-    ['Lunch', '2 roti + rice, dal, paneer/egg curry, salad, curd'],
-    ['Pre-workout', 'Banana + black coffee'],
-    ['Post-workout', 'Whey protein shake + fruit'],
-    ['Dinner', 'Egg curry or paneer, roti or rice, sabzi, salad'],
-    ['Before bed', 'Warm milk with a pinch of turmeric'],
+    ['Breakfast', '2-3 boiled eggs or egg bhurji with 2 roti'],
+    ['Lunch', 'Dal, chawal (rice), 2 roti, sabzi, curd'],
+    ['Snack', 'Boiled egg or a banana'],
+    ['Dinner', 'Egg curry or dal, 2 roti or chawal, sabzi'],
   ],
   non_veg: [
-    ['Early morning', 'Soaked almonds, water'],
-    ['Breakfast', '3-4 whole eggs, 2 multigrain toast, milk'],
-    ['Mid-morning', 'Greek yogurt, fruit'],
-    ['Lunch', 'Rice/roti, dal, grilled chicken or fish curry, salad'],
-    ['Pre-workout', 'Banana + black coffee'],
-    ['Post-workout', 'Whey protein shake + fruit'],
-    ['Dinner', 'Grilled chicken/fish/paneer, roti or rice, sabzi, salad'],
-    ['Before bed', 'Warm milk or casein'],
+    ['Breakfast', '3 boiled eggs with 2 roti'],
+    ['Lunch', 'Chawal (rice) or roti, dal, chicken/fish curry, salad'],
+    ['Snack', 'Boiled egg or a banana'],
+    ['Dinner', 'Chicken/fish curry or dal, roti or chawal, sabzi'],
   ],
   vegan: [
-    ['Early morning', 'Soaked almonds + walnuts, water'],
-    ['Breakfast', 'Tofu bhurji or oats with soy milk and peanut butter'],
-    ['Mid-morning', 'Soy yogurt or roasted chickpeas, fruit'],
-    ['Lunch', '2 roti + rice, dal, soya chunk/tofu curry, salad'],
-    ['Pre-workout', 'Banana + black coffee'],
-    ['Post-workout', 'Plant protein shake + fruit'],
-    ['Dinner', 'Tofu/soya curry, roti or rice, sabzi, salad'],
-    ['Before bed', 'Soy milk'],
+    ['Breakfast', 'Besan chilla with 2 roti, or a banana'],
+    ['Lunch', 'Dal, chawal (rice), 2 roti, sabzi'],
+    ['Snack', 'Roasted chana or a banana'],
+    ['Dinner', 'Dal or soya curry, 2 roti or chawal, sabzi'],
   ],
 };
 
-/* ---------------- Exercise icons (original animated stick figures) ---------------- */
+/* ---------------- Exercise icons (original animated stick figures) ----------------
+   Animated with native SVG <animateTransform> (SMIL): each rotation/translate names
+   an explicit pivot point in the icon's own coordinate space, so it renders the same
+   on every mobile browser instead of depending on CSS transform-box support. */
+
+function rotateAnim(from, to, cx, cy, dur) {
+  return `<animateTransform attributeName="transform" type="rotate" values="${from} ${cx} ${cy};${to} ${cx} ${cy};${from} ${cx} ${cy}" dur="${dur}s" repeatCount="indefinite"/>`;
+}
+
+function translateAnim(dx, dy, dur) {
+  return `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy};0 0" dur="${dur}s" repeatCount="indefinite"/>`;
+}
 
 function exIconSVG(pattern) {
   const HEAD = '<circle class="ex-head" cx="50" cy="17" r="7"/>';
   const TORSO = '<line class="ex-body" x1="50" y1="24" x2="50" y2="60"/>';
-  const LEGS = '<g class="ex-legs"><line class="ex-body" x1="50" y1="60" x2="41" y2="92"/><line class="ex-body" x1="50" y1="60" x2="59" y2="92"/></g>';
-  const ARMS = '<g class="ex-arms"><line class="ex-body" x1="50" y1="28" x2="37" y2="50"/><line class="ex-body" x1="50" y1="28" x2="63" y2="50"/></g>';
+  const LEGS = '<line class="ex-body" x1="50" y1="60" x2="41" y2="92"/><line class="ex-body" x1="50" y1="60" x2="59" y2="92"/>';
+  const ARMS = '<line class="ex-body" x1="50" y1="28" x2="37" y2="50"/><line class="ex-body" x1="50" y1="28" x2="63" y2="50"/>';
 
   switch (pattern) {
     case 'push':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, -35, 50, 28, 1.2)}</g></svg>`;
     case 'pull':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, 35, 50, 28, 1.2)}</g></svg>`;
     case 'vpress':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, -155, 50, 28, 1.4)}</g></svg>`;
     case 'vpull':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(-170, -105, 50, 28, 1.3)}</g></svg>`;
     case 'raise':
-      return `<svg class="ex-icon anim-${pattern}" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}${ARMS}</svg>`;
-    case 'squat':
-      return `<svg class="ex-icon anim-squat" viewBox="0 0 100 100"><g class="ex-upper">${HEAD}${TORSO}${ARMS}</g>${LEGS}</svg>`;
-    case 'hinge':
-      return `<svg class="ex-icon anim-hinge" viewBox="0 0 100 100"><g class="ex-upper">${HEAD}${TORSO}${ARMS}</g>${LEGS}</svg>`;
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, -85, 50, 28, 1.2)}</g></svg>`;
     case 'curl':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<line class="ex-body" x1="50" y1="28" x2="36" y2="46"/><g><line class="ex-body" x1="36" y1="46" x2="32" y2="62"/>${rotateAnim(0, -110, 36, 46, 1.1)}</g></svg>`;
     case 'extension':
-      return `<svg class="ex-icon anim-${pattern}" viewBox="0 0 100 100">
-        ${HEAD}${TORSO}${LEGS}
-        <line class="ex-body" x1="50" y1="28" x2="36" y2="46"/>
-        <line class="ex-body ex-forearm" x1="36" y1="46" x2="32" y2="62"/>
-      </svg>`;
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<line class="ex-body" x1="50" y1="28" x2="36" y2="46"/><g><line class="ex-body" x1="36" y1="46" x2="32" y2="62"/>${rotateAnim(-100, 0, 36, 46, 1.1)}</g></svg>`;
+    case 'squat':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${LEGS}<g>${HEAD}${TORSO}${ARMS}${translateAnim(0, 9, 1.4)}</g></svg>`;
+    case 'hinge':
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${LEGS}<g>${HEAD}${TORSO}${ARMS}${rotateAnim(0, 42, 50, 60, 1.3)}</g></svg>`;
     case 'core':
-      return `<svg class="ex-icon anim-core" viewBox="0 0 100 100">
-        <g class="ex-figure">
+      return `<svg class="ex-icon" viewBox="0 0 100 100"><g>
           <circle class="ex-head" cx="20" cy="55" r="7"/>
           <line class="ex-body" x1="27" y1="55" x2="75" y2="58"/>
           <line class="ex-body" x1="25" y1="62" x2="25" y2="78"/>
           <line class="ex-body" x1="75" y1="58" x2="90" y2="75"/>
-        </g>
-      </svg>`;
+          ${translateAnim(0, -1.6, 1.6)}
+        </g></svg>`;
     case 'cardio':
-      return `<svg class="ex-icon anim-cardio" viewBox="0 0 100 100">
+      return `<svg class="ex-icon" viewBox="0 0 100 100">
         <circle class="ex-head" cx="54" cy="20" r="7"/>
         <line class="ex-body" x1="50" y1="24" x2="54" y2="58"/>
-        <line class="ex-body ex-leg-l" x1="52" y1="58" x2="40" y2="90"/>
-        <line class="ex-body ex-leg-r" x1="52" y1="58" x2="64" y2="90"/>
-        <line class="ex-body ex-arm-l" x1="54" y1="30" x2="40" y2="48"/>
-        <line class="ex-body ex-arm-r" x1="54" y1="30" x2="68" y2="48"/>
+        <g><line class="ex-body" x1="52" y1="58" x2="40" y2="90"/>${rotateAnim(28, -28, 52, 58, 0.7)}</g>
+        <g><line class="ex-body" x1="52" y1="58" x2="64" y2="90"/>${rotateAnim(-28, 28, 52, 58, 0.7)}</g>
+        <g><line class="ex-body" x1="54" y1="30" x2="40" y2="48"/>${rotateAnim(-24, 24, 54, 30, 0.7)}</g>
+        <g><line class="ex-body" x1="54" y1="30" x2="68" y2="48"/>${rotateAnim(24, -24, 54, 30, 0.7)}</g>
       </svg>`;
     default:
       return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}${ARMS}</svg>`;
@@ -553,7 +533,7 @@ function renderStrengthDay(wd, muscle) {
       return `
       <div class="exercise">
         <div class="row" style="align-items:flex-start;gap:10px;">
-          ${exIconSVG(ex.pattern)}
+          <div class="ex-icon-wrap">${exIconSVG(ex.pattern)}</div>
           <div style="flex:1;">
             <div class="exercise-name">${escapeHtml(ex.name)}</div>
             <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
@@ -579,7 +559,7 @@ function renderCardioDay(wd) {
       (a, i) => `
     <div class="exercise">
       <div class="row" style="align-items:flex-start;gap:10px;">
-        ${exIconSVG('cardio')}
+        <div class="ex-icon-wrap">${exIconSVG('cardio')}</div>
         <div style="flex:1;">
           <div class="exercise-name">${escapeHtml(a.activity)}</div>
           <div class="tiny">Target: ${a.duration}</div>
