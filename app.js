@@ -443,6 +443,43 @@ function lastExercisePerformance(name) {
   return null;
 }
 
+function parseRepTarget(repsStr) {
+  const match = String(repsStr).match(/(\d+)(?:\s*-\s*(\d+))?/);
+  if (!match) return null;
+  const lo = Number(match[1]);
+  const hi = match[2] ? Number(match[2]) : lo;
+  return { lo, hi };
+}
+
+function roundToHalf(n) {
+  return Math.round(n * 2) / 2;
+}
+
+/* Progressive overload: once every logged set at last session met the top of the
+   rep target, nudge the weight up; if sets fell short of the bottom, repeat the
+   weight and re-chase the rep target; otherwise nudge reps by one at the same
+   weight. Skipped for time-based or AMRAP targets, which have no rep number to
+   compare against. */
+function suggestProgression(ex, lastSets) {
+  if (!lastSets || !lastSets.length) return null;
+  if (/sec|min|failure/i.test(ex.reps)) return null;
+  const target = parseRepTarget(ex.reps);
+  if (!target) return null;
+  const validSets = lastSets.filter((s) => s.weight != null && s.reps != null);
+  if (!validSets.length) return null;
+  const maxWeight = Math.max(...validSets.map((s) => s.weight));
+  const allHitTop = validSets.every((s) => s.reps >= target.hi);
+  const allBelowMin = validSets.every((s) => s.reps < target.lo);
+  if (allHitTop) {
+    const bump = maxWeight >= 20 ? 2.5 : 1;
+    return { weight: roundToHalf(maxWeight + bump), reps: target.lo, note: `hit ${target.hi}+ reps last time — try a bit heavier` };
+  }
+  if (allBelowMin) {
+    return { weight: maxWeight, reps: target.lo, note: `aim for ${target.lo}+ reps at the same weight` };
+  }
+  return { weight: maxWeight, reps: Math.min(validSets[0].reps + 1, target.hi), note: 'try for one more rep' };
+}
+
 function collectActiveDates() {
   const set = new Set();
   state.workoutLog.forEach((s) => set.add(s.date));
@@ -579,11 +616,12 @@ function renderStrengthDay(wd, muscle) {
   const exercisesHtml = template
     .map((ex, exIdx) => {
       const last = lastExercisePerformance(ex.name);
+      const suggestion = suggestProgression(ex, last);
       const setsHtml = Array.from({ length: ex.sets })
         .map((_, setIdx) => {
           const lastSet = last && last[setIdx];
-          const phW = lastSet && lastSet.weight ? String(lastSet.weight) : 'kg';
-          const phR = lastSet && lastSet.reps ? String(lastSet.reps) : 'reps';
+          const phW = suggestion ? String(suggestion.weight) : lastSet && lastSet.weight ? String(lastSet.weight) : 'kg';
+          const phR = suggestion ? String(suggestion.reps) : lastSet && lastSet.reps ? String(lastSet.reps) : 'reps';
           return `
           <div class="set-row">
             <span class="tiny">${setIdx + 1}</span>
@@ -594,6 +632,9 @@ function renderStrengthDay(wd, muscle) {
         })
         .join('');
       const lastSummary = last ? ' · last: ' + last.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') : '';
+      const suggestionHtml = suggestion
+        ? `<div class="tiny" style="margin-top:2px;color:var(--series-1);">💡 ${suggestion.note} — try ${suggestion.weight}kg × ${suggestion.reps}</div>`
+        : '';
       return `
       <div class="exercise">
         <div class="row" style="align-items:flex-start;gap:10px;">
@@ -602,6 +643,7 @@ function renderStrengthDay(wd, muscle) {
             <div class="exercise-name">${escapeHtml(ex.name)}</div>
             <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
             <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)}</div>
+            ${suggestionHtml}
           </div>
         </div>
         ${setsHtml}
@@ -611,8 +653,57 @@ function renderStrengthDay(wd, muscle) {
   return `
     <div class="card">
       ${exercisesHtml}
-      <button class="btn-primary" style="margin-top:12px;" data-action="save-workout" data-weekday="${wd}" data-muscle="${muscle}">Save workout</button>
+      <div id="extraExercises"></div>
+      <button type="button" class="btn-secondary btn-block" style="margin-top:12px;" data-action="add-extra-exercise">+ Log something extra</button>
+      <button class="btn-primary" style="margin-top:8px;" data-action="save-workout" data-weekday="${wd}" data-muscle="${muscle}">Save workout</button>
     </div>`;
+}
+
+function addExtraExerciseBlock() {
+  const container = document.getElementById('extraExercises');
+  if (!container) return;
+  const idx = container.querySelectorAll('[data-extra-block]').length;
+  const block = document.createElement('div');
+  block.className = 'exercise';
+  block.setAttribute('data-extra-block', String(idx));
+  block.innerHTML = `
+    <div class="row" style="align-items:center;gap:8px;">
+      <input type="text" placeholder="What did you do extra?" data-extra="${idx}" data-field="name" style="flex:1;" />
+      <button type="button" class="link-btn" data-action="remove-extra">✕</button>
+    </div>
+    ${[0, 1, 2]
+      .map(
+        (setIdx) => `
+      <div class="set-row">
+        <span class="tiny">${setIdx + 1}</span>
+        <input type="number" inputmode="decimal" placeholder="kg" data-extra="${idx}" data-set="${setIdx}" data-field="weight" />
+        <input type="number" inputmode="numeric" placeholder="reps" data-extra="${idx}" data-set="${setIdx}" data-field="reps" />
+        <span></span>
+      </div>`
+      )
+      .join('')}
+  `;
+  container.appendChild(block);
+}
+
+function collectExtraExercises() {
+  const blocks = document.querySelectorAll('#extraExercises [data-extra-block]');
+  const extras = [];
+  blocks.forEach((block) => {
+    const nameEl = block.querySelector('[data-field="name"]');
+    const name = nameEl && nameEl.value.trim();
+    if (!name) return;
+    const sets = [];
+    for (let setIdx = 0; setIdx < 3; setIdx++) {
+      const wEl = block.querySelector(`[data-set="${setIdx}"][data-field="weight"]`);
+      const rEl = block.querySelector(`[data-set="${setIdx}"][data-field="reps"]`);
+      const w = wEl ? wEl.value : '';
+      const r = rEl ? rEl.value : '';
+      if (w || r) sets.push({ weight: w ? Number(w) : null, reps: r ? Number(r) : null });
+    }
+    if (sets.length) extras.push({ name, sets });
+  });
+  return extras;
 }
 
 function renderCardioDay(wd) {
@@ -679,11 +770,12 @@ function saveWorkout(weekday, muscle) {
       return { name: ex.name, sets };
     })
     .filter((ex) => ex.sets.length);
-  if (!exercises.length) {
+  const allExercises = [...exercises, ...collectExtraExercises()];
+  if (!allExercises.length) {
     toast('Log at least one set first');
     return;
   }
-  state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises });
+  state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises: allExercises });
   state.activeWeekday = null;
   saveState();
   toast('Workout saved 💪');
@@ -1388,6 +1480,11 @@ function handleAppClick(e) {
     exportData();
   } else if (action === 'reset-data') {
     resetData();
+  } else if (action === 'add-extra-exercise') {
+    addExtraExerciseBlock();
+  } else if (action === 'remove-extra') {
+    const block = btn.closest('[data-extra-block]');
+    if (block) block.remove();
   } else if (action === 'clear-overrides') {
     state.exerciseOverrides = {};
     saveState();
