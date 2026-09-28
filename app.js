@@ -168,6 +168,8 @@ const EATING_OUT_PRESETS = [
   { name: 'Restaurant omelette + toast', unit: '1', cal: 400, protein: 20, carbs: 30, fat: 20 },
 ];
 
+const MEAL_SLOT_FRACTIONS = { Breakfast: 0.25, Lunch: 0.35, Snack: 0.1, Dinner: 0.3 };
+
 const MEAL_TEMPLATES = {
   vegetarian: [
     ['Breakfast', 'Paneer bhurji with 2 roti, or milk with a fruit'],
@@ -298,7 +300,17 @@ function exIconSVG(pattern) {
 /* ---------------- State ---------------- */
 
 function defaultState() {
-  return { profile: null, weightLog: [], workoutLog: [], dietLog: {}, activeWeekday: null, exerciseOverrides: {} };
+  return {
+    profile: null,
+    weightLog: [],
+    workoutLog: [],
+    dietLog: {},
+    activeWeekday: null,
+    exerciseOverrides: {},
+    prLog: [],
+    measurementLog: [],
+    lastBackupAt: null,
+  };
 }
 
 function loadState() {
@@ -607,6 +619,19 @@ function scheduleNudgeHtml() {
   return `<div class="card nudge"><p style="margin:0;">⏰ Haven't logged today's <b>${MUSCLE_LABELS[muscle]}</b> session yet — still time to get it in.</p></div>`;
 }
 
+function backupNudgeHtml() {
+  const totalEntries = state.workoutLog.length + Object.values(state.dietLog).reduce((n, l) => n + l.length, 0);
+  if (totalEntries < 10) return '';
+  if (!state.lastBackupAt) {
+    return `<div class="card nudge"><p style="margin:0;">💾 You've logged a fair bit — everything lives only on this device. <button class="link-btn" data-action="export-data">Back it up now</button> in case you switch phones or clear your browser.</p></div>`;
+  }
+  const daysSince = Math.floor((new Date() - new Date(state.lastBackupAt)) / 86400000);
+  if (daysSince >= 30) {
+    return `<div class="card nudge"><p style="margin:0;">💾 Last backup was ${daysSince} days ago. <button class="link-btn" data-action="export-data">Back up again</button>?</p></div>`;
+  }
+  return '';
+}
+
 function levelUpNudgeHtml() {
   const p = state.profile;
   if (p.experience === 'advanced') return '';
@@ -663,6 +688,7 @@ function renderDashboard() {
     </div>
     ${scheduleNudgeHtml()}
     ${deloadBannerHtml()}
+    ${backupNudgeHtml()}
     ${levelUpNudgeHtml()}
     <div class="card">
       <h3>Today's targets</h3>
@@ -837,10 +863,11 @@ function renderCardioDay(wd) {
 
 function workoutHistoryHtml() {
   if (!state.workoutLog.length) return '<p class="empty-state">No sessions logged yet.</p>';
-  return [...state.workoutLog]
+  return state.workoutLog
+    .map((s, i) => ({ session: s, idx: i }))
     .reverse()
     .slice(0, 10)
-    .map((s) => {
+    .map(({ session: s, idx }) => {
       const label = MUSCLE_LABELS[s.muscle] || s.muscle || '';
       let detail = '';
       if (s.exercises) {
@@ -850,7 +877,7 @@ function workoutHistoryHtml() {
         const totalMin = s.activities.reduce((n, a) => n + a.minutes, 0);
         detail = `${totalMin} min`;
       }
-      return `<div class="log-entry"><span>${s.date} · ${label}</span><span class="tiny">${detail}</span></div>`;
+      return `<div class="log-entry"><span>${s.date} · ${label}</span><span class="tiny">${detail} <button class="link-btn" data-action="delete-workout" data-i="${idx}">✕</button></span></div>`;
     })
     .join('');
 }
@@ -875,13 +902,22 @@ function saveWorkout(weekday, muscle) {
     toast('Log at least one set first');
     return;
   }
+  const prs = [];
+  allExercises.forEach((ex) => {
+    const prevMax = maxWeightEver(ex.name);
+    const todayMax = Math.max(0, ...ex.sets.map((s) => s.weight || 0));
+    if (prevMax > 0 && todayMax > prevMax) {
+      prs.push({ date: todayStr(), exercise: ex.name, weight: todayMax });
+    }
+  });
   state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises: allExercises });
+  state.prLog.push(...prs);
   state.activeWeekday = null;
   Object.keys(sessionSwaps).forEach((key) => {
     if (key.startsWith(`${muscle}:`)) delete sessionSwaps[key];
   });
   saveState();
-  toast('Workout saved 💪');
+  toast(prs.length ? `🏆 New PR! ${prs.map((p) => `${p.exercise} ${p.weight}kg`).join(', ')}` : 'Workout saved 💪');
   render();
 }
 
@@ -981,8 +1017,27 @@ function renderDiet() {
     </div>
     <div class="card">
       <h3>Suggested meal plan — ${DIET_LABELS[p.diet]}</h3>
-      <p class="tiny">Scale portions to hit the totals above. This is a starting template, not a prescription.</p>
-      ${mealPlan.map(([slot, desc]) => `<div class="log-entry"><span>${slot}</span><span class="tiny" style="text-align:right;max-width:65%;">${desc}</span></div>`).join('')}
+      <p class="tiny">Scale portions to hit the totals above. Tap "+ Log" for a rough estimate against today's totals, or log the exact food above once you've eaten.</p>
+      ${mealPlan
+        .map(([slot, desc]) => {
+          const frac = MEAL_SLOT_FRACTIONS[slot] || 0.25;
+          const est = {
+            cal: Math.round(targets.calories * frac),
+            protein: Math.round(targets.protein * frac),
+            carbs: Math.round(targets.carbs * frac),
+            fat: Math.round(targets.fat * frac),
+          };
+          return `
+      <div class="log-entry">
+        <span>${slot}</span>
+        <span class="tiny" style="text-align:right;max-width:55%;">${desc}</span>
+      </div>
+      <div class="row" style="margin:-2px 0 8px;">
+        <span class="tiny">~${est.cal} kcal</span>
+        <button class="btn-secondary" data-action="log-meal-slot" data-slot="${slot}" data-cal="${est.cal}" data-protein="${est.protein}" data-carbs="${est.carbs}" data-fat="${est.fat}">+ Log</button>
+      </div>`;
+        })
+        .join('')}
     </div>
   `;
 }
@@ -1015,7 +1070,7 @@ function removeFoodEntry(i) {
 
 /* ---------------- Rendering: Progress ---------------- */
 
-function buildWeightChartSVG(entries) {
+function buildLineChartSVG(entries, idPrefix) {
   const W = 320,
     H = 170,
     padL = 34,
@@ -1046,21 +1101,21 @@ function buildWeightChartSVG(entries) {
     .join('');
   const dots = points.map((pt, i) => `<circle class="dot" data-i="${i}" cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="4" />`).join('');
   return `
-    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" height="170" id="weightChartSvg">
+    <svg class="chart" viewBox="0 0 ${W} ${H}" width="100%" height="170" id="${idPrefix}Svg">
       ${gridLines}
       <line class="baseline" x1="${padL}" y1="${(padT + innerH).toFixed(1)}" x2="${W - padR}" y2="${(padT + innerH).toFixed(1)}" />
       <text x="2" y="${padT + 4}">${max.toFixed(1)}</text>
       <text x="2" y="${padT + innerH}">${min.toFixed(1)}</text>
       <path class="line" d="${pathD}" />
       ${dots}
-      <line class="crosshair" id="crosshairLine" x1="0" y1="${padT}" x2="0" y2="${(padT + innerH).toFixed(1)}" style="opacity:0" />
+      <line class="crosshair" id="${idPrefix}Crosshair" x1="0" y1="${padT}" x2="0" y2="${(padT + innerH).toFixed(1)}" style="opacity:0" />
     </svg>`;
 }
 
-function wireWeightChart(entries) {
-  const svg = document.getElementById('weightChartSvg');
+function wireLineChart(entries, idPrefix) {
+  const svg = document.getElementById(`${idPrefix}Svg`);
   if (!svg || entries.length < 2) return;
-  const crosshair = document.getElementById('crosshairLine');
+  const crosshair = document.getElementById(`${idPrefix}Crosshair`);
   const container = svg.closest('.chart-wrap');
   let tooltip = container.querySelector('.tooltip');
   if (!tooltip) {
@@ -1116,16 +1171,89 @@ function wireWeightChart(entries) {
   });
 }
 
+function maxWeightEver(name) {
+  let max = 0;
+  state.workoutLog.forEach((s) => {
+    if (!s.exercises) return;
+    s.exercises.forEach((ex) => {
+      if (ex.name !== name) return;
+      ex.sets.forEach((set) => {
+        if (set.weight && set.weight > max) max = set.weight;
+      });
+    });
+  });
+  return max;
+}
+
+function loggedExerciseNames() {
+  const names = new Set();
+  state.workoutLog.forEach((s) => {
+    if (s.exercises) s.exercises.forEach((e) => names.add(e.name));
+  });
+  return [...names].sort();
+}
+
+function exerciseHistorySeries(name) {
+  const points = [];
+  state.workoutLog.forEach((s) => {
+    if (!s.exercises) return;
+    const ex = s.exercises.find((e) => e.name === name);
+    if (!ex) return;
+    const maxW = Math.max(0, ...ex.sets.map((set) => set.weight || 0));
+    if (maxW > 0) points.push({ date: s.date, weightKg: maxW });
+  });
+  return points;
+}
+
+let activeExerciseChart = null;
+
+function prHistoryHtml() {
+  if (!state.prLog.length) return '<p class="empty-state">No PRs yet — keep logging, your first one is coming.</p>';
+  return [...state.prLog]
+    .reverse()
+    .slice(0, 8)
+    .map((pr) => `<div class="log-entry"><span>🏆 ${escapeHtml(pr.exercise)}</span><span class="tiny">${pr.weight} kg · ${pr.date}</span></div>`)
+    .join('');
+}
+
+function measurementSummaryHtml() {
+  if (!state.measurementLog.length) return '<p class="empty-state" style="margin-top:8px;">No measurements logged yet.</p>';
+  const first = state.measurementLog[0];
+  const last = state.measurementLog[state.measurementLog.length - 1];
+  const fields = ['chest', 'arm', 'waist', 'thigh'];
+  const rows = fields
+    .filter((f) => last[f] != null)
+    .map((f) => {
+      const change = first[f] != null ? (last[f] - first[f]).toFixed(1) : null;
+      const label = f.charAt(0).toUpperCase() + f.slice(1);
+      return `<div class="log-entry"><span>${label}</span><span class="tiny">${last[f]} cm${change !== null && Number(change) !== 0 ? ` (${change > 0 ? '+' : ''}${change} since ${first.date})` : ''}</span></div>`;
+    })
+    .join('');
+  return `<div style="margin-top:6px;">${rows}</div>`;
+}
+
 function renderProgress() {
   const entries = [...state.weightLog].sort((a, b) => a.date.localeCompare(b.date));
   const chartHtml =
     entries.length >= 2
-      ? `<div class="chart-wrap" style="position:relative;">${buildWeightChartSVG(entries)}</div>`
+      ? `<div class="chart-wrap" style="position:relative;">${buildLineChartSVG(entries, 'weightChart')}</div>`
       : '<p class="empty-state">Log your weight a few times to see a trend line.</p>';
   const first = entries[0],
     last = entries[entries.length - 1];
   const change = first && last && first !== last ? (last.weightKg - first.weightKg).toFixed(1) : null;
   const weekCount = state.workoutLog.filter((s) => isThisWeek(s.date)).length;
+
+  const exNames = loggedExerciseNames();
+  const selectedExercise = activeExerciseChart && exNames.includes(activeExerciseChart) ? activeExerciseChart : exNames[0];
+  let liftChartHtml = '<p class="empty-state">Log a lift a couple of times to see its strength curve.</p>';
+  if (selectedExercise) {
+    const liftEntries = exerciseHistorySeries(selectedExercise);
+    liftChartHtml =
+      liftEntries.length >= 2
+        ? `<div class="chart-wrap" style="position:relative;">${buildLineChartSVG(liftEntries, 'exerciseChart')}</div>`
+        : '<p class="empty-state">Log this lift again to see a trend line.</p>';
+  }
+
   return `
     <div class="card">
       <h3>Log today's weight</h3>
@@ -1140,11 +1268,51 @@ function renderProgress() {
       ${change !== null ? `<p class="tiny">${change > 0 ? '+' : ''}${change} kg since ${first.date}</p>` : ''}
     </div>
     <div class="card">
+      <h3>Strength progress</h3>
+      ${
+        exNames.length
+          ? `<select id="exerciseChartPicker">${exNames.map((n) => `<option value="${escapeHtml(n)}" ${n === selectedExercise ? 'selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select>`
+          : ''
+      }
+      <div style="margin-top:8px;">${liftChartHtml}</div>
+      <p class="tiny">Heaviest weight logged per session, for the picked exercise.</p>
+    </div>
+    <div class="card">
+      <h3>Personal records</h3>
+      ${prHistoryHtml()}
+    </div>
+    <div class="card">
+      <h3>Body measurements (cm)</h3>
+      <form id="measurementForm">
+        <div class="grid2">
+          <label>Chest<input type="number" step="0.1" name="chest" placeholder="cm" /></label>
+          <label>Arm<input type="number" step="0.1" name="arm" placeholder="cm" /></label>
+        </div>
+        <div class="grid2">
+          <label>Waist<input type="number" step="0.1" name="waist" placeholder="cm" /></label>
+          <label>Thigh<input type="number" step="0.1" name="thigh" placeholder="cm" /></label>
+        </div>
+        <button type="submit" class="btn-secondary btn-block">Log measurements</button>
+      </form>
+      ${measurementSummaryHtml()}
+    </div>
+    <div class="card">
       <h3>Consistency</h3>
       <p style="margin:0 0 4px;">${weekCount} / 6 scheduled sessions logged this week</p>
       <p class="tiny" style="margin:0;">${state.workoutLog.length} total sessions logged all-time</p>
     </div>
   `;
+}
+
+function logMeasurements(fields) {
+  const date = todayStr();
+  const existingIdx = state.measurementLog.findIndex((m) => m.date === date);
+  if (existingIdx >= 0) state.measurementLog[existingIdx] = { ...state.measurementLog[existingIdx], date, ...fields };
+  else state.measurementLog.push({ date, ...fields });
+  state.measurementLog.sort((a, b) => a.date.localeCompare(b.date));
+  saveState();
+  toast('Measurements logged');
+  render();
 }
 
 function logWeight(weightKg) {
@@ -1252,6 +1420,8 @@ function exportData() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  state.lastBackupAt = todayStr();
+  saveState();
 }
 
 function resetData() {
@@ -1560,7 +1730,10 @@ function render() {
   } else if (currentTab === 'progress') {
     app.innerHTML = renderProgress();
     const entries = [...state.weightLog].sort((a, b) => a.date.localeCompare(b.date));
-    wireWeightChart(entries);
+    wireLineChart(entries, 'weightChart');
+    const exNames = loggedExerciseNames();
+    const selectedExercise = activeExerciseChart && exNames.includes(activeExerciseChart) ? activeExerciseChart : exNames[0];
+    if (selectedExercise) wireLineChart(exerciseHistorySeries(selectedExercise), 'exerciseChart');
   } else if (currentTab === 'settings') {
     app.innerHTML = renderSettings();
   }
@@ -1616,6 +1789,21 @@ function handleAppClick(e) {
     saveState();
     toast('Exercise swaps cleared');
     render();
+  } else if (action === 'delete-workout') {
+    if (!confirm('Delete this logged session?')) return;
+    state.workoutLog.splice(Number(btn.dataset.i), 1);
+    saveState();
+    toast('Session deleted');
+    render();
+  } else if (action === 'log-meal-slot') {
+    addFoodEntry({
+      name: `${btn.dataset.slot} (plan)`,
+      cal: Number(btn.dataset.cal) || 0,
+      protein: Number(btn.dataset.protein) || 0,
+      carbs: Number(btn.dataset.carbs) || 0,
+      fat: Number(btn.dataset.fat) || 0,
+    });
+    toast(`Logged ${btn.dataset.slot}`);
   }
 }
 
@@ -1651,11 +1839,23 @@ function handleAppSubmit(e) {
     setGeminiKey(fd.get('geminiKey').trim());
     toast('Saved');
     render();
+  } else if (e.target.id === 'measurementForm') {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const fields = {};
+    ['chest', 'arm', 'waist', 'thigh'].forEach((k) => {
+      const v = fd.get(k);
+      if (v) fields[k] = Number(v);
+    });
+    if (Object.keys(fields).length) logMeasurements(fields);
   }
 }
 
 function handleAppChange(e) {
-  if (e.target.id === 'importFile') {
+  if (e.target.id === 'exerciseChartPicker') {
+    activeExerciseChart = e.target.value;
+    render();
+  } else if (e.target.id === 'importFile') {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
