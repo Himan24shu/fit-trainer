@@ -774,6 +774,26 @@ function levelUpNudgeHtml() {
 
 /* ---------------- Rendering: Dashboard ---------------- */
 
+const MOTIVATIONAL_QUOTES = [
+  'Discipline beats motivation. Show up anyway.',
+  "The weight doesn't care about your excuses — lift it anyway.",
+  'Small daily wins build the body you want.',
+  "Har din thoda better — that's the whole game.",
+  "You don't need to feel like it. You just need to start.",
+  'Consistency is the only supplement that actually works.',
+  'One more rep than yesterday is still progress.',
+  'Your only competition is who you were last week.',
+  "Rest when you're tired, not when you're bored.",
+  'Progress, not perfection.',
+  'The best workout is the one you actually did.',
+  'Bhai, showing up today is 90% of the battle.',
+];
+
+function todaysQuote() {
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
+}
+
 function renderDashboard() {
   const p = state.profile;
   const targets = calcTargets(p);
@@ -809,12 +829,14 @@ function renderDashboard() {
       </div>`;
   }
 
+  const streak = calcStreak();
   return `
-    <div class="card">
-      <h2 style="margin-bottom:4px;">Hi ${escapeHtml(p.name)} 👋</h2>
-      <p class="muted" style="margin:0 0 4px;">${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-      <p class="tiny" style="margin:0;">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''}</p>
-      <p class="tiny" style="margin:4px 0 0;">${weeklyCheckinText()}</p>
+    <div class="card hero-card">
+      <p class="hero-date">${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+      <h2 class="hero-greeting">Hi ${escapeHtml(p.name)} 👋</h2>
+      <div class="hero-streak">🔥 ${streak} day streak</div>
+      <p class="hero-quote">"${escapeHtml(todaysQuote())}"</p>
+      <p class="hero-meta">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''} · ${weeklyCheckinText()}</p>
     </div>
     ${readinessCheckinHtml()}
     ${readinessTipHtml()}
