@@ -336,6 +336,7 @@ function defaultState() {
     lastBackupAt: null,
     readinessLog: [],
     waterLog: [],
+    aiMode: 'gemini',
   };
 }
 
@@ -1619,12 +1620,20 @@ function renderSettings() {
     </div>
     <div class="card">
       <h3>AI Assistant</h3>
-      <p class="tiny">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/apikey</b> (sign in, then copy the key shown or tap "Create API key" — no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
+      <div class="chip-row">
+        <button type="button" class="chip ${state.aiMode !== 'local' ? 'active' : ''}" data-action="set-ai-mode" data-mode="gemini">☁️ Gemini (needs free key)</button>
+        <button type="button" class="chip ${state.aiMode === 'local' ? 'active' : ''}" data-action="set-ai-mode" data-mode="local">📱 On-device (no sign-up)</button>
+      </div>
+      ${
+        state.aiMode === 'local'
+          ? `<p class="tiny" style="margin-top:8px;">Runs a small AI model directly in your phone's browser — completely free, no account ever. Downloads once (~600-900MB) then works offline. It's weaker than Gemini and needs a browser with WebGPU (recent Chrome on Android; often unavailable on older phones or iOS Safari). It reliably handles simple commands — log weight, change goal/experience/diet, log cardio minutes, switch screens — plus general chat, but for logging specific foods with accurate macros, Gemini does much better.</p>`
+          : `<p class="tiny" style="margin-top:8px;">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/apikey</b> (sign in, then copy the key shown or tap "Create API key" — no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
       <form id="aiKeyForm">
         <input type="password" name="geminiKey" placeholder="Paste your Gemini API key" value="${escapeHtml(getGeminiKey())}" />
         <button type="submit" class="btn-secondary btn-block" style="margin-top:8px;">Save key</button>
       </form>
-      ${getGeminiKey() ? '<p class="tiny" style="margin-top:8px;">Key saved — the assistant is ready.</p>' : ''}
+      ${getGeminiKey() ? '<p class="tiny" style="margin-top:8px;">Key saved — the assistant is ready.</p>' : ''}`
+      }
       ${Object.keys(state.exerciseOverrides).length ? '<button class="btn-secondary btn-block" style="margin-top:8px;" data-action="clear-overrides">Clear AI exercise swaps</button>' : ''}
     </div>
     <div class="card">
@@ -1937,6 +1946,86 @@ async function callAssistant(userText, history) {
   return { text: results.length ? results.join(' ') : data.output_text || 'Done.' };
 }
 
+/* ---------------- On-device AI (zero sign-up, runs in the browser) ----------------
+   No account, no key, genuinely free forever — the trade-off is a much weaker
+   model and a large one-time download, and it needs WebGPU (recent Chrome on
+   Android; often unavailable on older phones or iOS Safari).
+
+   WebLLM's native function-calling is explicitly work-in-progress upstream, so
+   rather than depend on a small local model reliably emitting structured tool
+   calls, the handful of clearly-phrased commands below are matched with plain
+   regex and run the exact same tool handlers Gemini mode uses — deterministic,
+   so they work every time regardless of model quality. Anything else (especially
+   free-form food logging, which needs real language understanding to estimate
+   macros) falls through to the small model as plain conversation, with an honest
+   nudge toward the Gemini option for that case. */
+
+const LOCAL_MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+const LOCAL_AI_SYSTEM_PROMPT =
+  'You are a friendly fitness assistant inside the FitTrainer app. Give short, practical answers about workouts, diet, and fitness in 2-3 sentences.';
+
+let localEngine = null;
+
+function tryLocalCommand(text) {
+  const t = text.toLowerCase().trim();
+  let m;
+  if ((m = t.match(/(?:log|set) (?:my )?weight (?:as|to|=)?\s*(\d+(?:\.\d+)?)/))) {
+    return toolLogWeight({ weightKg: Number(m[1]) });
+  }
+  if ((m = t.match(/(?:change|set) my goal to (fat loss|muscle gain|general fitness|general)/))) {
+    const map = { 'fat loss': 'fat_loss', 'muscle gain': 'muscle_gain', general: 'general', 'general fitness': 'general' };
+    return toolUpdateProfile({ goal: map[m[1]] });
+  }
+  if ((m = t.match(/(?:change|set) my (?:experience|level) to (beginner|intermediate|advanced)/))) {
+    return toolUpdateProfile({ experience: m[1] });
+  }
+  if ((m = t.match(/(?:change|set) my diet to (vegetarian|eggetarian|non-?\s?veg(?:etarian)?|vegan)/))) {
+    const map = { vegetarian: 'vegetarian', eggetarian: 'eggetarian', vegan: 'vegan' };
+    return toolUpdateProfile({ diet: map[m[1]] || 'non_veg' });
+  }
+  if ((m = t.match(/log (\d+) min(?:ute)?s? (?:of )?cardio/))) {
+    return toolLogCardio({ minutes: Number(m[1]) });
+  }
+  if ((m = t.match(/(?:go to|open|switch to|take me to) (dashboard|home|workout|diet|progress|settings)/))) {
+    return toolNavigate({ tab: m[1] === 'home' ? 'dashboard' : m[1] });
+  }
+  return null;
+}
+
+async function ensureLocalEngine() {
+  if (localEngine) return localEngine;
+  const webllm = await import('https://esm.run/@mlc-ai/web-llm');
+  localEngine = await webllm.CreateMLCEngine(LOCAL_MODEL_ID, {
+    initProgressCallback: (report) => {
+      const pending = document.querySelector('.ai-msg.pending');
+      if (pending) pending.textContent = report.text || 'Loading on-device AI…';
+    },
+  });
+  return localEngine;
+}
+
+async function callLocalAssistant(userText, history) {
+  const localResult = tryLocalCommand(userText);
+  if (localResult) return { text: localResult };
+  if (!navigator.gpu) {
+    return {
+      text: "This phone/browser doesn't support on-device AI (it needs WebGPU). Try Chrome on a recent Android phone, or switch to the Gemini option in Settings.",
+    };
+  }
+  if (!localEngine) {
+    const proceed = confirm('This downloads a small AI model (~600-900MB) to your phone once, then works fully offline with no sign-up. Continue?');
+    if (!proceed) {
+      return { text: 'No problem — try again anytime, or switch to the free Gemini option in Settings.' };
+    }
+  }
+  const engine = await ensureLocalEngine();
+  const historyMsgs = history.slice(-6).map((h) => ({ role: h.type === 'user_input' ? 'user' : 'assistant', content: h.content }));
+  const messages = [{ role: 'system', content: LOCAL_AI_SYSTEM_PROMPT }, ...historyMsgs, { role: 'user', content: userText }];
+  const response = await engine.chat.completions.create({ messages, temperature: 0.7, max_tokens: 200 });
+  const reply = (response.choices[0] && response.choices[0].message.content) || "Sorry, I didn't catch that — try rephrasing?";
+  return { text: reply };
+}
+
 let aiHistory = [];
 
 function localProactiveInsight() {
@@ -1989,7 +2078,8 @@ async function handleAiSubmit(e) {
   const pending = appendAiMessage('assistant', 'Thinking…');
   pending.classList.add('pending');
   try {
-    const { text: reply } = await callAssistant(text, aiHistory);
+    const caller = state.aiMode === 'local' ? callLocalAssistant : callAssistant;
+    const { text: reply } = await caller(text, aiHistory);
     pending.textContent = reply;
     pending.classList.remove('pending');
     aiHistory.push({ type: 'user_input', content: text });
@@ -2069,6 +2159,10 @@ function handleAppClick(e) {
       toast(`Swapped in ${next.name} for today`);
       render();
     }
+  } else if (action === 'set-ai-mode') {
+    state.aiMode = btn.dataset.mode;
+    saveState();
+    render();
   } else if (action === 'clear-overrides') {
     state.exerciseOverrides = {};
     saveState();
