@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#2a78d6" />
+<title>FitTrainer</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" type="image/png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">FitTrainer</div>
+  <div class="streak" id="streakPill">🔥 0 day streak</div>
+</header>
+
+<main id="app" class="app"></main>
+
+<nav class="tabbar" id="tabbar">
+  <button class="tab-btn" data-tab="dashboard" aria-label="Dashboard">
+    <span class="tab-icon">🏠</span><span class="tab-label">Home</span>
+  </button>
+  <button class="tab-btn" data-tab="workout" aria-label="Workout">
+    <span class="tab-icon">🏋️</span><span class="tab-label">Workout</span>
+  </button>
+  <button class="tab-btn" data-tab="diet" aria-label="Diet">
+    <span class="tab-icon">🍽️</span><span class="tab-label">Diet</span>
+  </button>
+  <button class="tab-btn" data-tab="progress" aria-label="Progress">
+    <span class="tab-icon">📈</span><span class="tab-label">Progress</span>
+  </button>
+  <button class="tab-btn" data-tab="settings" aria-label="Settings">
+    <span class="tab-icon">⚙️</span><span class="tab-label">Settings</span>
+  </button>
+</nav>
+
+<div id="onboardingOverlay" class="overlay hidden">
+  <div class="sheet">
+    <h1>Welcome 👋</h1>
+    <p class="muted">A few details so your calorie, protein and workout targets are actually yours.</p>
+    <form id="onboardingForm">
+      <label>Name
+        <input type="text" name="name" placeholder="Your name" required />
+      </label>
+      <div class="grid2">
+        <label>Sex
+          <select name="sex">
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>Age
+          <input type="number" name="age" min="13" max="90" required />
+        </label>
+      </div>
+      <div class="grid2">
+        <label>Height (cm)
+          <input type="number" name="heightCm" min="120" max="230" required />
+        </label>
+        <label>Weight (kg)
+          <input type="number" name="weightKg" min="30" max="250" step="0.1" required />
+        </label>
+      </div>
+      <label>Activity level (outside the gym)
+        <select name="activityLevel">
+          <option value="sedentary">Sedentary — desk job, little walking</option>
+          <option value="light">Light — some walking, occasional activity</option>
+          <option value="moderate" selected>Moderate — on your feet a fair bit</option>
+          <option value="active">Active — physically demanding day</option>
+        </select>
+      </label>
+      <label>Goal
+        <select name="goal">
+          <option value="fat_loss">Fat loss</option>
+          <option value="muscle_gain" selected>Muscle gain</option>
+          <option value="general">General fitness</option>
+        </select>
+      </label>
+      <label>Diet preference
+        <select name="diet">
+          <option value="vegetarian">Vegetarian</option>
+          <option value="eggetarian" selected>Eggetarian</option>
+          <option value="non_veg">Non-vegetarian</option>
+          <option value="vegan">Vegan</option>
+        </select>
+      </label>
+      <label>Gym experience
+        <select name="experience">
+          <option value="beginner" selected>Beginner</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </label>
+      <label>Training days per week
+        <select name="daysPerWeek">
+          <option value="3" selected>3 days</option>
+          <option value="4">4 days</option>
+          <option value="5">5 days</option>
+          <option value="6">6 days</option>
+        </select>
+      </label>
+      <button type="submit" class="btn-primary">Build my plan</button>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
