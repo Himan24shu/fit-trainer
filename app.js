@@ -26,6 +26,7 @@ const STRENGTH_TEMPLATES = {
       { name: 'Flat Dumbbell Bench Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Lower under control, press up without locking elbows hard.' },
       { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Slight bench incline, press up and slightly inward.' },
       { name: 'Push-up', sets: 3, reps: 'to near-failure', pattern: 'pushup', cue: 'Straight body line, chest brushes the floor.' },
+      { name: 'Machine Chest Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Adjust the seat so the handles line up with mid-chest.' },
     ],
     intermediate: [
       { name: 'Barbell Bench Press', sets: 4, reps: '8-10', pattern: 'bench', cue: 'Bar to mid-chest, drive feet into the floor.' },
@@ -46,6 +47,7 @@ const STRENGTH_TEMPLATES = {
       { name: 'Lat Pulldown', sets: 3, reps: '10-12', pattern: 'vpull', cue: 'Pull to upper chest, squeeze shoulder blades together.' },
       { name: 'Seated Cable Row', sets: 3, reps: '10-12', pattern: 'pull', cue: 'Drive elbows back, keep chest up.' },
       { name: 'Assisted Pull-up / Band Pulldown', sets: 3, reps: '8-10', pattern: 'vpull', cue: 'Full stretch at the top, chin over the bar at the bottom.' },
+      { name: 'Chest-Supported Row', sets: 3, reps: '10-12', pattern: 'pull', cue: 'Chest stays on the pad the whole set, squeeze at the top.' },
     ],
     intermediate: [
       { name: 'Barbell Row', sets: 4, reps: '8-10', pattern: 'pull', cue: 'Flat back, pull to the belly button.' },
@@ -66,6 +68,7 @@ const STRENGTH_TEMPLATES = {
       { name: 'Dumbbell Shoulder Press', sets: 3, reps: '10-12', pattern: 'vpress', cue: 'Press straight up, don’t flare elbows too wide.' },
       { name: 'Lateral Raise', sets: 3, reps: '12-15', pattern: 'raise', cue: 'Lead with the elbows, raise to shoulder height only.' },
       { name: 'Front Raise', sets: 3, reps: '12-15', pattern: 'raise', cue: 'Slight bend in the elbow, raise to eye level.' },
+      { name: 'Machine Shoulder Press', sets: 3, reps: '10-12', pattern: 'vpress', cue: 'Controlled path up and down, don’t lock out hard at the top.' },
     ],
     intermediate: [
       { name: 'Barbell/Dumbbell Overhead Press', sets: 4, reps: '8-10', pattern: 'vpress', cue: 'Brace the core, press directly overhead.' },
@@ -86,6 +89,7 @@ const STRENGTH_TEMPLATES = {
       { name: 'Dumbbell Bicep Curl', sets: 3, reps: '10-12', pattern: 'curl', cue: 'Elbows pinned to your sides the whole rep.' },
       { name: 'Triceps Pushdown', sets: 3, reps: '10-12', pattern: 'extension', cue: 'Elbows stay tucked, only the forearm moves.' },
       { name: 'Hammer Curl', sets: 3, reps: '10-12', pattern: 'curl', cue: 'Neutral grip, palms facing each other.' },
+      { name: 'Overhead Dumbbell Triceps Extension', sets: 3, reps: '10-12', pattern: 'extension', cue: 'Keep elbows pointed forward, don’t let them flare out.' },
     ],
     intermediate: [
       { name: 'Barbell Curl', sets: 4, reps: '8-10', pattern: 'curl', cue: 'No swinging — let the biceps do the work.' },
@@ -143,6 +147,26 @@ const CARDIO_TEMPLATES = {
     { activity: 'Battle rope or rowing machine', duration: '10 min', cue: 'Full-body effort, drive with the legs on the rower.' },
     { activity: 'Bodyweight circuit', duration: '4 rounds', cue: 'Jumping jacks, mountain climbers, burpees, high knees.' },
   ],
+};
+
+/* Every training day gets the same two bookends: a general warm-up (light
+   cardio + a muscle-specific mobility move) before the lifts, and a short
+   cardio finisher after — separate from Friday's dedicated cardio day, which
+   stays the main cardio session of the week. */
+const WARMUP_ROUTINES = {
+  chest: ['5 min light cardio (treadmill or cycle)', 'Arm circles x15 each direction', 'Band pull-aparts x15', '1-2 light warm-up sets of the first exercise'],
+  back: ['5 min light cardio', 'Cat-cow stretch x10', 'Band pull-aparts x15', '1-2 light warm-up sets of the first exercise'],
+  shoulders: ['5 min light cardio', 'Arm circles x15 each direction', 'Shoulder rolls x15', '1-2 light warm-up sets of the first exercise'],
+  arms: ['5 min light cardio', 'Arm circles x15', 'Wrist rotations x10 each direction', '1-2 light warm-up sets of the first exercise'],
+  legs: ['5 min light cardio', 'Bodyweight squats x15', 'Leg swings x10 each leg', '1-2 light warm-up sets of the first exercise'],
+};
+
+const FINISHER_CARDIO = {
+  chest: '5-10 min incline walk or easy cycling',
+  back: '5-10 min rowing machine or incline walk, easy pace',
+  shoulders: '5 min incline walk, easy pace',
+  arms: '5 min skipping rope or incline walk, easy pace',
+  legs: '5 min easy cycling (skip anything high-impact after heavy leg work)',
 };
 
 const FOOD_DB = [
@@ -894,12 +918,23 @@ function renderStrengthDay(wd, muscle) {
       </div>`;
     })
     .join('');
+  const warmup = WARMUP_ROUTINES[muscle] || [];
   return `
+    <div class="card">
+      <h3>Warm-up</h3>
+      <ul style="padding-left:18px; margin:8px 0 0;">
+        ${warmup.map((step) => `<li class="tiny">${escapeHtml(step)}</li>`).join('')}
+      </ul>
+    </div>
     <div class="card">
       ${exercisesHtml}
       <div id="extraExercises"></div>
       <button type="button" class="btn-secondary btn-block" style="margin-top:12px;" data-action="add-extra-exercise">+ Log something extra</button>
       <button class="btn-primary" style="margin-top:8px;" data-action="save-workout" data-weekday="${wd}" data-muscle="${muscle}">Save workout</button>
+    </div>
+    <div class="card">
+      <h3>Cardio finisher</h3>
+      <p class="tiny" style="margin:0;">${escapeHtml(FINISHER_CARDIO[muscle] || '')}</p>
     </div>`;
 }
 
@@ -1013,6 +1048,10 @@ function renderCardioDay(wd) {
     )
     .join('');
   return `
+    <div class="card">
+      <h3>Warm-up</h3>
+      <p class="tiny" style="margin:8px 0 0;">2-3 min easy pace to raise your heart rate gradually, then ramp into the first activity below — don't jump straight to top effort.</p>
+    </div>
     <div class="card">
       ${itemsHtml}
       <button class="btn-primary" style="margin-top:12px;" data-action="save-cardio" data-weekday="${wd}">Save session</button>
