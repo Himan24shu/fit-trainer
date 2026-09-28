@@ -23,22 +23,22 @@ const MUSCLE_LABELS = { chest: 'Chest', back: 'Back', shoulders: 'Shoulders', ar
 const STRENGTH_TEMPLATES = {
   chest: {
     beginner: [
-      { name: 'Flat Dumbbell Bench Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Lower under control, press up without locking elbows hard.' },
-      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Slight bench incline, press up and slightly inward.' },
-      { name: 'Push-up', sets: 3, reps: 'to near-failure', pattern: 'push', cue: 'Straight body line, chest brushes the floor.' },
+      { name: 'Flat Dumbbell Bench Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Lower under control, press up without locking elbows hard.' },
+      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Slight bench incline, press up and slightly inward.' },
+      { name: 'Push-up', sets: 3, reps: 'to near-failure', pattern: 'pushup', cue: 'Straight body line, chest brushes the floor.' },
     ],
     intermediate: [
-      { name: 'Barbell Bench Press', sets: 4, reps: '8-10', pattern: 'push', cue: 'Bar to mid-chest, drive feet into the floor.' },
-      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Control the negative, full stretch at the bottom.' },
-      { name: 'Cable Fly', sets: 3, reps: '12-15', pattern: 'push', cue: 'Slight elbow bend, squeeze hands together in front.' },
-      { name: 'Bench Dips / Dips', sets: 3, reps: '10-12', pattern: 'push', cue: 'Elbows track back, don’t flare wide.' },
+      { name: 'Barbell Bench Press', sets: 4, reps: '8-10', pattern: 'bench', cue: 'Bar to mid-chest, drive feet into the floor.' },
+      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'bench', cue: 'Control the negative, full stretch at the bottom.' },
+      { name: 'Cable Fly', sets: 3, reps: '12-15', pattern: 'bench', cue: 'Slight elbow bend, squeeze hands together in front.' },
+      { name: 'Bench Dips / Dips', sets: 3, reps: '10-12', pattern: 'dip', cue: 'Elbows track back, don’t flare wide.' },
     ],
     advanced: [
-      { name: 'Barbell Bench Press', sets: 5, reps: '5', pattern: 'push', cue: 'Heavy top set, tight upper back on the bench.' },
-      { name: 'Incline Barbell/DB Press', sets: 4, reps: '8', pattern: 'push', cue: 'Same bar path every rep, no bounce.' },
-      { name: 'Weighted Dips', sets: 4, reps: '8', pattern: 'push', cue: 'Add load once bodyweight dips feel easy.' },
-      { name: 'Cable Fly', sets: 4, reps: '12-15', pattern: 'push', cue: 'Finish with a squeeze, control the stretch back.' },
-      { name: 'Push-up Finisher', sets: 3, reps: 'to near-failure', pattern: 'push', cue: 'Burnout set after the heavy work is done.' },
+      { name: 'Barbell Bench Press', sets: 5, reps: '5', pattern: 'bench', cue: 'Heavy top set, tight upper back on the bench.' },
+      { name: 'Incline Barbell/DB Press', sets: 4, reps: '8', pattern: 'bench', cue: 'Same bar path every rep, no bounce.' },
+      { name: 'Weighted Dips', sets: 4, reps: '8', pattern: 'dip', cue: 'Add load once bodyweight dips feel easy.' },
+      { name: 'Cable Fly', sets: 4, reps: '12-15', pattern: 'bench', cue: 'Finish with a squeeze, control the stretch back.' },
+      { name: 'Push-up Finisher', sets: 3, reps: 'to near-failure', pattern: 'pushup', cue: 'Burnout set after the heavy work is done.' },
     ],
   },
   back: {
@@ -51,14 +51,14 @@ const STRENGTH_TEMPLATES = {
       { name: 'Barbell Row', sets: 4, reps: '8-10', pattern: 'pull', cue: 'Flat back, pull to the belly button.' },
       { name: 'Lat Pulldown', sets: 3, reps: '10-12', pattern: 'vpull', cue: 'Lead with the elbows, not the hands.' },
       { name: 'Single-arm Dumbbell Row', sets: 3, reps: '10-12 / side', pattern: 'pull', cue: 'Support on a bench, row straight up to the hip.' },
-      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'pull', cue: 'Pull to the face, thumbs point back at the top.' },
+      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'raise', cue: 'Pull to the face, thumbs point back at the top.' },
     ],
     advanced: [
       { name: 'Deadlift', sets: 5, reps: '5', pattern: 'hinge', cue: 'Hips and shoulders rise together, bar stays close to the shins.' },
       { name: 'Weighted Pull-up', sets: 4, reps: '6-8', pattern: 'vpull', cue: 'Dead hang start, chin clears the bar.' },
       { name: 'Pendlay Row', sets: 4, reps: '8', pattern: 'pull', cue: 'Bar rests on the floor between every rep.' },
       { name: 'Single-arm Dumbbell Row', sets: 3, reps: '10 / side', pattern: 'pull', cue: 'Add weight once form is locked in.' },
-      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'pull', cue: 'Light weight, high reps, pure rear-delt work.' },
+      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'raise', cue: 'Light weight, high reps, pure rear-delt work.' },
     ],
   },
   shoulders: {
@@ -95,7 +95,7 @@ const STRENGTH_TEMPLATES = {
     ],
     advanced: [
       { name: 'Barbell Curl', sets: 4, reps: '8', pattern: 'curl', cue: 'Heaviest curl variation — prioritize control.' },
-      { name: 'Close-Grip Bench Press', sets: 4, reps: '8', pattern: 'push', cue: 'Compound triceps builder, hands just inside shoulder width.' },
+      { name: 'Close-Grip Bench Press', sets: 4, reps: '8', pattern: 'bench', cue: 'Compound triceps builder, hands just inside shoulder width.' },
       { name: 'Skull Crushers', sets: 4, reps: '10', pattern: 'extension', cue: 'Add load slowly — this one is hard on the elbows.' },
       { name: 'Incline Dumbbell Curl', sets: 3, reps: '10', pattern: 'curl', cue: 'Incline bench stretches the biceps harder.' },
       { name: 'Triceps Pushdown Dropset', sets: 4, reps: '15', pattern: 'extension', cue: 'Finish the arm day completely spent.' },
@@ -205,10 +205,50 @@ function exIconSVG(pattern) {
   const ARMS = '<line class="ex-body" x1="50" y1="28" x2="37" y2="50"/><line class="ex-body" x1="50" y1="28" x2="63" y2="50"/>';
 
   switch (pattern) {
-    case 'push':
-      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, -35, 50, 28, 1.2)}</g></svg>`;
+    case 'bench':
+      /* Lying on a bench, one arm pressing a dumbbell straight up from the chest. */
+      return `<svg class="ex-icon" viewBox="0 0 100 100">
+        <line class="ex-body" x1="8" y1="70" x2="88" y2="70"/>
+        <circle class="ex-head" cx="18" cy="52" r="7"/>
+        <line class="ex-body" x1="25" y1="54" x2="66" y2="57"/>
+        <line class="ex-body" x1="66" y1="57" x2="76" y2="46"/>
+        <line class="ex-body" x1="76" y1="46" x2="84" y2="68"/>
+        <line class="ex-body" x1="42" y1="55" x2="38" y2="40"/>
+        <g><line class="ex-body" x1="38" y1="40" x2="32" y2="20"/>${rotateAnim(0, 60, 38, 40, 1.2)}</g>
+      </svg>`;
+    case 'pushup':
+      /* Horizontal plank, whole body bobbing up and down like a push-up rep. */
+      return `<svg class="ex-icon" viewBox="0 0 100 100"><g>
+          <circle class="ex-head" cx="18" cy="55" r="7"/>
+          <line class="ex-body" x1="25" y1="55" x2="76" y2="58"/>
+          <line class="ex-body" x1="24" y1="62" x2="22" y2="80"/>
+          <line class="ex-body" x1="76" y1="58" x2="90" y2="76"/>
+          ${translateAnim(0, 7, 1.1)}
+        </g></svg>`;
+    case 'dip':
+      /* Parallel bars with the body dipping down between them. */
+      return `<svg class="ex-icon" viewBox="0 0 100 100">
+        <line class="ex-body" x1="26" y1="22" x2="26" y2="78"/>
+        <line class="ex-body" x1="74" y1="22" x2="74" y2="78"/>
+        <g>
+          <circle class="ex-head" cx="50" cy="32" r="7"/>
+          <line class="ex-body" x1="50" y1="39" x2="50" y2="60"/>
+          <line class="ex-body" x1="50" y1="44" x2="30" y2="50"/>
+          <line class="ex-body" x1="50" y1="44" x2="70" y2="50"/>
+          <line class="ex-body" x1="50" y1="60" x2="44" y2="80"/>
+          <line class="ex-body" x1="50" y1="60" x2="56" y2="80"/>
+          ${translateAnim(0, 10, 1.3)}
+        </g>
+      </svg>`;
     case 'pull':
-      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, 35, 50, 28, 1.2)}</g></svg>`;
+      /* Bent-over row: torso hinged forward, arm driving an elbow back. */
+      return `<svg class="ex-icon" viewBox="0 0 100 100">
+        <line class="ex-body" x1="50" y1="60" x2="41" y2="92"/>
+        <line class="ex-body" x1="50" y1="60" x2="59" y2="92"/>
+        <circle class="ex-head" cx="24" cy="24" r="7"/>
+        <line class="ex-body" x1="30" y1="29" x2="50" y2="60"/>
+        <g><line class="ex-body" x1="34" y1="34" x2="55" y2="45"/>${rotateAnim(0, -55, 34, 34, 1.2)}</g>
+      </svg>`;
     case 'vpress':
       return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}<g>${ARMS}${rotateAnim(0, -155, 50, 28, 1.4)}</g></svg>`;
     case 'vpull':
