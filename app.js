@@ -1619,7 +1619,7 @@ function renderSettings() {
     </div>
     <div class="card">
       <h3>AI Assistant</h3>
-      <p class="tiny">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/app/apikey</b> (no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
+      <p class="tiny">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/apikey</b> (sign in, then copy the key shown or tap "Create API key" — no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
       <form id="aiKeyForm">
         <input type="password" name="geminiKey" placeholder="Paste your Gemini API key" value="${escapeHtml(getGeminiKey())}" />
         <button type="submit" class="btn-secondary btn-block" style="margin-top:8px;">Save key</button>
@@ -1693,7 +1693,7 @@ function resetData() {
    mutation the app already exposes through its own UI. */
 
 const GEMINI_KEY_STORAGE = 'fittrainer_gemini_key';
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3.8-flash';
 
 function getGeminiKey() {
   return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
@@ -1704,76 +1704,88 @@ function setGeminiKey(key) {
   else localStorage.removeItem(GEMINI_KEY_STORAGE);
 }
 
+/* Gemini's REST API moved to the "Interactions" shape (POST /v1beta/interactions)
+   sometime after early 2026: tool declarations are flat {type:'function', name,
+   description, parameters} objects using standard lowercase JSON-Schema types,
+   not the old {functionDeclarations:[...]} wrapper with uppercase STRING/NUMBER/
+   OBJECT enums. Confirmed against ai.google.dev's current docs 2026-09-28. */
 const AI_TOOLS = [
   {
+    type: 'function',
     name: 'update_profile',
     description: "Update the user's profile: body weight, height, age, sex, activity level, fitness goal, diet preference, or gym experience level. Only include fields the user actually wants changed.",
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        weightKg: { type: 'NUMBER', description: 'Body weight in kg' },
-        heightCm: { type: 'NUMBER' },
-        age: { type: 'NUMBER' },
-        sex: { type: 'STRING', enum: ['male', 'female', 'other'] },
-        activityLevel: { type: 'STRING', enum: ['sedentary', 'light', 'moderate', 'active'] },
-        goal: { type: 'STRING', enum: ['fat_loss', 'muscle_gain', 'general'] },
-        diet: { type: 'STRING', enum: ['vegetarian', 'eggetarian', 'non_veg', 'vegan'] },
-        experience: { type: 'STRING', enum: ['beginner', 'intermediate', 'advanced'] },
+        weightKg: { type: 'number', description: 'Body weight in kg' },
+        heightCm: { type: 'number' },
+        age: { type: 'number' },
+        sex: { type: 'string', enum: ['male', 'female', 'other'] },
+        activityLevel: { type: 'string', enum: ['sedentary', 'light', 'moderate', 'active'] },
+        goal: { type: 'string', enum: ['fat_loss', 'muscle_gain', 'general'] },
+        diet: { type: 'string', enum: ['vegetarian', 'eggetarian', 'non_veg', 'vegan'] },
+        experience: { type: 'string', enum: ['beginner', 'intermediate', 'advanced'] },
       },
     },
   },
   {
+    type: 'function',
     name: 'log_weight',
     description: "Log the user's body weight for today.",
-    parameters: { type: 'OBJECT', properties: { weightKg: { type: 'NUMBER' } }, required: ['weightKg'] },
+    parameters: { type: 'object', properties: { weightKg: { type: 'number' } }, required: ['weightKg'] },
   },
   {
+    type: 'function',
     name: 'add_food',
     description: "Add a food entry to today's diet log. Estimate reasonable nutrition values yourself (Indian home cooking, e.g. dal/chawal/roti/egg style) if the user doesn't give exact numbers.",
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        name: { type: 'STRING' },
-        cal: { type: 'NUMBER', description: 'Calories for one serving' },
-        protein: { type: 'NUMBER', description: 'Grams of protein for one serving' },
-        carbs: { type: 'NUMBER', description: 'Grams of carbs for one serving' },
-        fat: { type: 'NUMBER', description: 'Grams of fat for one serving' },
-        qty: { type: 'NUMBER', description: 'How many servings, defaults to 1' },
+        name: { type: 'string' },
+        cal: { type: 'number', description: 'Calories for one serving' },
+        protein: { type: 'number', description: 'Grams of protein for one serving' },
+        carbs: { type: 'number', description: 'Grams of carbs for one serving' },
+        fat: { type: 'number', description: 'Grams of fat for one serving' },
+        qty: { type: 'number', description: 'How many servings, defaults to 1' },
       },
       required: ['name', 'cal', 'protein', 'carbs', 'fat'],
     },
   },
   {
+    type: 'function',
     name: 'remove_last_food',
     description: "Remove a food entry from today's diet log — the most recent one, or a named one if the user specifies it.",
-    parameters: { type: 'OBJECT', properties: { name: { type: 'STRING' } } },
+    parameters: { type: 'object', properties: { name: { type: 'string' } } },
   },
   {
+    type: 'function',
     name: 'log_cardio_minutes',
     description: 'Log minutes of cardio the user did today.',
-    parameters: { type: 'OBJECT', properties: { minutes: { type: 'NUMBER' } }, required: ['minutes'] },
+    parameters: { type: 'object', properties: { minutes: { type: 'number' } }, required: ['minutes'] },
   },
   {
+    type: 'function',
     name: 'replace_exercise',
     description: "Swap one exercise in the user's weekly workout plan for a different one, for a given muscle-group day. Applies to their current experience level.",
     parameters: {
-      type: 'OBJECT',
+      type: 'object',
       properties: {
-        muscle: { type: 'STRING', enum: ['chest', 'back', 'shoulders', 'arms', 'legs'] },
-        originalName: { type: 'STRING', description: 'The exact existing exercise name to replace' },
-        newName: { type: 'STRING' },
-        sets: { type: 'NUMBER' },
-        reps: { type: 'STRING', description: 'e.g. "10-12" or "8"' },
+        muscle: { type: 'string', enum: ['chest', 'back', 'shoulders', 'arms', 'legs'] },
+        originalName: { type: 'string', description: 'The exact existing exercise name to replace' },
+        newName: { type: 'string' },
+        sets: { type: 'number' },
+        reps: { type: 'string', description: 'e.g. "10-12" or "8"' },
       },
       required: ['muscle', 'originalName', 'newName'],
     },
   },
   {
+    type: 'function',
     name: 'navigate',
     description: 'Switch the app to a different screen.',
     parameters: {
-      type: 'OBJECT',
-      properties: { tab: { type: 'STRING', enum: ['dashboard', 'workout', 'diet', 'progress', 'settings'] } },
+      type: 'object',
+      properties: { tab: { type: 'string', enum: ['dashboard', 'workout', 'diet', 'progress', 'settings'] } },
       required: ['tab'],
     },
   },
@@ -1893,15 +1905,16 @@ async function callAssistant(userText, history) {
   if (!apiKey) {
     return { text: 'Add a free Gemini API key in Settings → AI Assistant to turn this on.' };
   }
-  const contents = [...history.map((h) => ({ role: h.role, parts: [{ text: h.text }] })), { role: 'user', parts: [{ text: userText }] }];
   const body = {
-    contents,
-    systemInstruction: { parts: [{ text: aiSystemInstruction() }] },
-    tools: [{ functionDeclarations: AI_TOOLS }],
+    model: GEMINI_MODEL,
+    system_instruction: aiSystemInstruction(),
+    input: [...history, { type: 'user_input', content: userText }],
+    tools: AI_TOOLS,
+    store: false,
   };
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -1909,24 +1922,19 @@ async function callAssistant(userText, history) {
     throw new Error(`Gemini API error ${res.status}: ${errText.slice(0, 180)}`);
   }
   const data = await res.json();
-  const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+  const steps = data.steps || [];
   const results = [];
-  let textReply = '';
-  for (const part of parts) {
-    if (part.functionCall) {
-      const handler = AI_TOOL_HANDLERS[part.functionCall.name];
-      if (handler) {
-        try {
-          results.push(handler(part.functionCall.args || {}));
-        } catch (err) {
-          results.push('Something went wrong making that change.');
-        }
-      }
-    } else if (part.text) {
-      textReply += part.text;
+  for (const step of steps) {
+    if (step.type !== 'function_call') continue;
+    const handler = AI_TOOL_HANDLERS[step.name];
+    if (!handler) continue;
+    try {
+      results.push(handler(step.arguments || {}));
+    } catch (err) {
+      results.push('Something went wrong making that change.');
     }
   }
-  return { text: results.length ? results.join(' ') : textReply || 'Done.' };
+  return { text: results.length ? results.join(' ') : data.output_text || 'Done.' };
 }
 
 let aiHistory = [];
@@ -1956,7 +1964,7 @@ function openAiSheet() {
   if (!container.children.length) {
     const greeting = localProactiveInsight();
     appendAiMessage('assistant', greeting);
-    aiHistory.push({ role: 'model', text: greeting });
+    aiHistory.push({ type: 'model_output', content: greeting });
   }
   document.getElementById('aiInput').focus();
 }
@@ -1984,8 +1992,8 @@ async function handleAiSubmit(e) {
     const { text: reply } = await callAssistant(text, aiHistory);
     pending.textContent = reply;
     pending.classList.remove('pending');
-    aiHistory.push({ role: 'user', text });
-    aiHistory.push({ role: 'model', text: reply });
+    aiHistory.push({ type: 'user_input', content: text });
+    aiHistory.push({ type: 'model_output', content: reply });
     if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
   } catch (err) {
     pending.textContent = `Couldn't reach the AI: ${err.message}`;
