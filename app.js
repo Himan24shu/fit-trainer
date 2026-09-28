@@ -1,82 +1,148 @@
 /* ---------------- Constants ---------------- */
 
 const STORE_KEY = 'fittrainer_v1';
-const DAY_CYCLE = ['A', 'B', 'C'];
 
 const ACTIVITY_MULT = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725 };
 const GOAL_LABELS = { fat_loss: 'Fat loss', muscle_gain: 'Muscle gain', general: 'General fitness' };
 const DIET_LABELS = { vegetarian: 'Vegetarian', eggetarian: 'Eggetarian', non_veg: 'Non-vegetarian', vegan: 'Vegan' };
 
-const WORKOUT_TEMPLATES = {
-  beginner: {
-    A: [
-      { name: 'Goblet Squat', sets: 3, reps: '10-12' },
-      { name: 'Flat Dumbbell Bench Press', sets: 3, reps: '10-12' },
-      { name: 'Seated Cable Row', sets: 3, reps: '10-12' },
-      { name: 'Dumbbell Shoulder Press', sets: 3, reps: '10-12' },
-      { name: 'Plank', sets: 3, reps: '30-45 sec' },
+const WEEKDAYS_BY_INDEX = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const WEEKDAYS_ORDERED = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const WEEKDAY_LABELS = {
+  monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday',
+  friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday',
+};
+const WEEKDAY_SHORT = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
+const WEEKDAY_MUSCLE = {
+  monday: 'chest', tuesday: 'back', wednesday: 'shoulders', thursday: 'arms',
+  friday: 'cardio', saturday: 'legs', sunday: 'rest',
+};
+const MUSCLE_LABELS = { chest: 'Chest', back: 'Back', shoulders: 'Shoulders', arms: 'Biceps & Triceps', cardio: 'Cardio', legs: 'Leg Day', rest: 'Rest Day' };
+
+/* Each strength exercise: { name, sets, reps, pattern, cue }. pattern drives the animated icon. */
+const STRENGTH_TEMPLATES = {
+  chest: {
+    beginner: [
+      { name: 'Flat Dumbbell Bench Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Lower under control, press up without locking elbows hard.' },
+      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Slight bench incline, press up and slightly inward.' },
+      { name: 'Push-up', sets: 3, reps: 'to near-failure', pattern: 'push', cue: 'Straight body line, chest brushes the floor.' },
     ],
-    B: [
-      { name: 'Dumbbell Romanian Deadlift', sets: 3, reps: '10-12' },
-      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12' },
-      { name: 'Lat Pulldown', sets: 3, reps: '10-12' },
-      { name: 'Leg Press', sets: 3, reps: '12 / leg' },
-      { name: 'Hanging Knee Raise', sets: 3, reps: '12-15' },
+    intermediate: [
+      { name: 'Barbell Bench Press', sets: 4, reps: '8-10', pattern: 'push', cue: 'Bar to mid-chest, drive feet into the floor.' },
+      { name: 'Incline Dumbbell Press', sets: 3, reps: '10-12', pattern: 'push', cue: 'Control the negative, full stretch at the bottom.' },
+      { name: 'Cable Fly', sets: 3, reps: '12-15', pattern: 'push', cue: 'Slight elbow bend, squeeze hands together in front.' },
+      { name: 'Bench Dips / Dips', sets: 3, reps: '10-12', pattern: 'push', cue: 'Elbows track back, don’t flare wide.' },
     ],
-    C: [
-      { name: 'Leg Press', sets: 3, reps: '12-15' },
-      { name: 'Machine Chest Press', sets: 3, reps: '10-12' },
-      { name: 'Chest-Supported Row', sets: 3, reps: '10-12' },
-      { name: 'Lateral Raise', sets: 3, reps: '12-15' },
-      { name: 'Cable Crunch', sets: 3, reps: '15' },
-    ],
-  },
-  intermediate: {
-    A: [
-      { name: 'Barbell Squat', sets: 4, reps: '8-10' },
-      { name: 'Barbell Bench Press', sets: 4, reps: '8-10' },
-      { name: 'Barbell Row', sets: 4, reps: '8-10' },
-      { name: 'Overhead Press', sets: 3, reps: '8-10' },
-      { name: 'Plank', sets: 3, reps: '45-60 sec' },
-    ],
-    B: [
-      { name: 'Deadlift', sets: 4, reps: '6-8' },
-      { name: 'Incline Bench Press', sets: 3, reps: '8-10' },
-      { name: 'Weighted Pull-up / Lat Pulldown', sets: 4, reps: '8-10' },
-      { name: 'Bulgarian Split Squat', sets: 3, reps: '10 / leg' },
-      { name: 'Hanging Leg Raise', sets: 3, reps: '12-15' },
-    ],
-    C: [
-      { name: 'Front Squat / Leg Press', sets: 4, reps: '8-10' },
-      { name: 'Close-Grip Bench Press', sets: 3, reps: '8-10' },
-      { name: 'Pendlay Row', sets: 4, reps: '8-10' },
-      { name: 'Dumbbell Lateral Raise', sets: 3, reps: '12-15' },
-      { name: 'Cable Crunch', sets: 3, reps: '15' },
+    advanced: [
+      { name: 'Barbell Bench Press', sets: 5, reps: '5', pattern: 'push', cue: 'Heavy top set, tight upper back on the bench.' },
+      { name: 'Incline Barbell/DB Press', sets: 4, reps: '8', pattern: 'push', cue: 'Same bar path every rep, no bounce.' },
+      { name: 'Weighted Dips', sets: 4, reps: '8', pattern: 'push', cue: 'Add load once bodyweight dips feel easy.' },
+      { name: 'Cable Fly', sets: 4, reps: '12-15', pattern: 'push', cue: 'Finish with a squeeze, control the stretch back.' },
+      { name: 'Push-up Finisher', sets: 3, reps: 'to near-failure', pattern: 'push', cue: 'Burnout set after the heavy work is done.' },
     ],
   },
-  advanced: {
-    A: [
-      { name: 'Barbell Squat', sets: 5, reps: '5' },
-      { name: 'Bench Press', sets: 5, reps: '5' },
-      { name: 'Weighted Pull-up', sets: 4, reps: '6-8' },
-      { name: 'Barbell Row', sets: 4, reps: '8' },
-      { name: 'Overhead Press', sets: 3, reps: '8' },
+  back: {
+    beginner: [
+      { name: 'Lat Pulldown', sets: 3, reps: '10-12', pattern: 'vpull', cue: 'Pull to upper chest, squeeze shoulder blades together.' },
+      { name: 'Seated Cable Row', sets: 3, reps: '10-12', pattern: 'pull', cue: 'Drive elbows back, keep chest up.' },
+      { name: 'Assisted Pull-up / Band Pulldown', sets: 3, reps: '8-10', pattern: 'vpull', cue: 'Full stretch at the top, chin over the bar at the bottom.' },
     ],
-    B: [
-      { name: 'Deadlift', sets: 5, reps: '5' },
-      { name: 'Incline Bench Press', sets: 4, reps: '8' },
-      { name: 'Bulgarian Split Squat', sets: 4, reps: '8 / leg' },
-      { name: 'Face Pull', sets: 3, reps: '15' },
-      { name: 'Hanging Leg Raise', sets: 4, reps: '12' },
+    intermediate: [
+      { name: 'Barbell Row', sets: 4, reps: '8-10', pattern: 'pull', cue: 'Flat back, pull to the belly button.' },
+      { name: 'Lat Pulldown', sets: 3, reps: '10-12', pattern: 'vpull', cue: 'Lead with the elbows, not the hands.' },
+      { name: 'Single-arm Dumbbell Row', sets: 3, reps: '10-12 / side', pattern: 'pull', cue: 'Support on a bench, row straight up to the hip.' },
+      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'pull', cue: 'Pull to the face, thumbs point back at the top.' },
     ],
-    C: [
-      { name: 'Front Squat', sets: 4, reps: '6' },
-      { name: 'Weighted Dip', sets: 4, reps: '8' },
-      { name: 'Pendlay Row', sets: 4, reps: '6' },
-      { name: 'Barbell Curl', sets: 3, reps: '10' },
-      { name: 'Lateral Raise', sets: 4, reps: '15' },
+    advanced: [
+      { name: 'Deadlift', sets: 5, reps: '5', pattern: 'hinge', cue: 'Hips and shoulders rise together, bar stays close to the shins.' },
+      { name: 'Weighted Pull-up', sets: 4, reps: '6-8', pattern: 'vpull', cue: 'Dead hang start, chin clears the bar.' },
+      { name: 'Pendlay Row', sets: 4, reps: '8', pattern: 'pull', cue: 'Bar rests on the floor between every rep.' },
+      { name: 'Single-arm Dumbbell Row', sets: 3, reps: '10 / side', pattern: 'pull', cue: 'Add weight once form is locked in.' },
+      { name: 'Face Pull', sets: 3, reps: '15', pattern: 'pull', cue: 'Light weight, high reps, pure rear-delt work.' },
     ],
   },
+  shoulders: {
+    beginner: [
+      { name: 'Dumbbell Shoulder Press', sets: 3, reps: '10-12', pattern: 'vpress', cue: 'Press straight up, don’t flare elbows too wide.' },
+      { name: 'Lateral Raise', sets: 3, reps: '12-15', pattern: 'raise', cue: 'Lead with the elbows, raise to shoulder height only.' },
+      { name: 'Front Raise', sets: 3, reps: '12-15', pattern: 'raise', cue: 'Slight bend in the elbow, raise to eye level.' },
+    ],
+    intermediate: [
+      { name: 'Barbell/Dumbbell Overhead Press', sets: 4, reps: '8-10', pattern: 'vpress', cue: 'Brace the core, press directly overhead.' },
+      { name: 'Lateral Raise', sets: 3, reps: '12-15', pattern: 'raise', cue: 'Light weight, strict form, no swinging.' },
+      { name: 'Rear Delt Fly', sets: 3, reps: '15', pattern: 'raise', cue: 'Hinge forward, squeeze the shoulder blades.' },
+      { name: 'Front Raise', sets: 3, reps: '12', pattern: 'raise', cue: 'Alternate arms if it’s easier to control.' },
+    ],
+    advanced: [
+      { name: 'Overhead Press', sets: 5, reps: '5', pattern: 'vpress', cue: 'Heavy top set, full lockout overhead.' },
+      { name: 'Arnold Press', sets: 4, reps: '8', pattern: 'vpress', cue: 'Rotate palms in on the way down.' },
+      { name: 'Lateral Raise Dropset', sets: 4, reps: '15', pattern: 'raise', cue: 'Drop the weight once form breaks, keep going.' },
+      { name: 'Rear Delt Fly', sets: 4, reps: '15', pattern: 'raise', cue: 'Never skip rear delts — they balance the pressing volume.' },
+      { name: 'Barbell Shrugs', sets: 3, reps: '12', pattern: 'raise', cue: 'Straight up and down, no rolling the shoulders.' },
+    ],
+  },
+  arms: {
+    beginner: [
+      { name: 'Dumbbell Bicep Curl', sets: 3, reps: '10-12', pattern: 'curl', cue: 'Elbows pinned to your sides the whole rep.' },
+      { name: 'Triceps Pushdown', sets: 3, reps: '10-12', pattern: 'extension', cue: 'Elbows stay tucked, only the forearm moves.' },
+      { name: 'Hammer Curl', sets: 3, reps: '10-12', pattern: 'curl', cue: 'Neutral grip, palms facing each other.' },
+    ],
+    intermediate: [
+      { name: 'Barbell Curl', sets: 4, reps: '8-10', pattern: 'curl', cue: 'No swinging — let the biceps do the work.' },
+      { name: 'Skull Crushers', sets: 3, reps: '10-12', pattern: 'extension', cue: 'Lower to the forehead, elbows stay fixed.' },
+      { name: 'Hammer Curl', sets: 3, reps: '10-12', pattern: 'curl', cue: 'Great for forearm size alongside biceps.' },
+      { name: 'Triceps Pushdown', sets: 3, reps: '12-15', pattern: 'extension', cue: 'Full lockout at the bottom of every rep.' },
+    ],
+    advanced: [
+      { name: 'Barbell Curl', sets: 4, reps: '8', pattern: 'curl', cue: 'Heaviest curl variation — prioritize control.' },
+      { name: 'Close-Grip Bench Press', sets: 4, reps: '8', pattern: 'push', cue: 'Compound triceps builder, hands just inside shoulder width.' },
+      { name: 'Skull Crushers', sets: 4, reps: '10', pattern: 'extension', cue: 'Add load slowly — this one is hard on the elbows.' },
+      { name: 'Incline Dumbbell Curl', sets: 3, reps: '10', pattern: 'curl', cue: 'Incline bench stretches the biceps harder.' },
+      { name: 'Triceps Pushdown Dropset', sets: 4, reps: '15', pattern: 'extension', cue: 'Finish the arm day completely spent.' },
+    ],
+  },
+  legs: {
+    beginner: [
+      { name: 'Leg Press', sets: 3, reps: '12-15', pattern: 'squat', cue: 'Feet shoulder-width, don’t lock knees at the top.' },
+      { name: 'Goblet Squat', sets: 3, reps: '10-12', pattern: 'squat', cue: 'Hold the dumbbell at your chest, sit between your heels.' },
+      { name: 'Leg Curl (machine)', sets: 3, reps: '12-15', pattern: 'squat', cue: 'Slow and controlled, feel the hamstring squeeze.' },
+      { name: 'Calf Raise', sets: 3, reps: '15-20', pattern: 'squat', cue: 'Full stretch at the bottom, pause at the top.' },
+    ],
+    intermediate: [
+      { name: 'Barbell Squat', sets: 4, reps: '8-10', pattern: 'squat', cue: 'Chest up, break at the hips and knees together.' },
+      { name: 'Romanian Deadlift', sets: 3, reps: '10', pattern: 'hinge', cue: 'Push hips back, feel the hamstring stretch.' },
+      { name: 'Leg Press', sets: 3, reps: '10-12', pattern: 'squat', cue: 'Add load once bodyweight squats feel too easy.' },
+      { name: 'Walking Lunge', sets: 3, reps: '10 / leg', pattern: 'squat', cue: 'Long stride, back knee taps just above the floor.' },
+      { name: 'Calf Raise', sets: 3, reps: '15', pattern: 'squat', cue: 'Slow tempo builds more than bouncing reps.' },
+    ],
+    advanced: [
+      { name: 'Barbell Squat', sets: 5, reps: '5', pattern: 'squat', cue: 'Heavy top set, brace hard before unracking.' },
+      { name: 'Romanian Deadlift', sets: 4, reps: '6', pattern: 'hinge', cue: 'Heavier pull, keep the bar close to the legs.' },
+      { name: 'Bulgarian Split Squat', sets: 4, reps: '8 / leg', pattern: 'squat', cue: 'Brutal but effective — balance before adding load.' },
+      { name: 'Leg Press', sets: 4, reps: '10', pattern: 'squat', cue: 'Push the volume once the barbell work is done.' },
+      { name: 'Calf Raise Dropset', sets: 4, reps: '20', pattern: 'squat', cue: 'End leg day with calves completely fried.' },
+    ],
+  },
+};
+
+const CARDIO_TEMPLATES = {
+  beginner: [
+    { activity: 'Brisk walk or treadmill', duration: '15 min, moderate pace', cue: 'You should be able to talk but slightly breathless.' },
+    { activity: 'Skipping rope', duration: '3 rounds x 1 min', cue: 'Rest ~1 min between rounds if needed.' },
+    { activity: 'Stationary cycling', duration: '10 min, easy pace', cue: 'Cool-down pace, keep the legs moving.' },
+  ],
+  intermediate: [
+    { activity: 'Jogging or treadmill', duration: '20 min, moderate pace', cue: 'Steady effort, hold a consistent pace.' },
+    { activity: 'Skipping rope', duration: '5 rounds x 1 min', cue: '30 sec rest between rounds.' },
+    { activity: 'Stair climber', duration: '10 min', cue: 'Keep torso upright, don’t lean on the rails.' },
+    { activity: 'Bodyweight circuit (jumping jacks, mountain climbers)', duration: '3 rounds', cue: '45 sec work, 15 sec rest per move.' },
+  ],
+  advanced: [
+    { activity: 'Interval running (HIIT)', duration: '20 min: 1 min sprint / 1 min walk x10', cue: 'Sprint should feel genuinely hard.' },
+    { activity: 'Skipping rope', duration: '8 rounds x 1 min', cue: 'Minimal rest — keep the heart rate up.' },
+    { activity: 'Battle rope or rowing machine', duration: '10 min', cue: 'Full-body effort, drive with the legs on the rower.' },
+    { activity: 'Bodyweight circuit', duration: '4 rounds', cue: 'Jumping jacks, mountain climbers, burpees, high knees.' },
+  ],
 };
 
 const FOOD_DB = [
@@ -150,10 +216,59 @@ const MEAL_TEMPLATES = {
   ],
 };
 
+/* ---------------- Exercise icons (original animated stick figures) ---------------- */
+
+function exIconSVG(pattern) {
+  const HEAD = '<circle class="ex-head" cx="50" cy="17" r="7"/>';
+  const TORSO = '<line class="ex-body" x1="50" y1="24" x2="50" y2="60"/>';
+  const LEGS = '<g class="ex-legs"><line class="ex-body" x1="50" y1="60" x2="41" y2="92"/><line class="ex-body" x1="50" y1="60" x2="59" y2="92"/></g>';
+  const ARMS = '<g class="ex-arms"><line class="ex-body" x1="50" y1="28" x2="37" y2="50"/><line class="ex-body" x1="50" y1="28" x2="63" y2="50"/></g>';
+
+  switch (pattern) {
+    case 'push':
+    case 'pull':
+    case 'vpress':
+    case 'vpull':
+    case 'raise':
+      return `<svg class="ex-icon anim-${pattern}" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}${ARMS}</svg>`;
+    case 'squat':
+      return `<svg class="ex-icon anim-squat" viewBox="0 0 100 100"><g class="ex-upper">${HEAD}${TORSO}${ARMS}</g>${LEGS}</svg>`;
+    case 'hinge':
+      return `<svg class="ex-icon anim-hinge" viewBox="0 0 100 100"><g class="ex-upper">${HEAD}${TORSO}${ARMS}</g>${LEGS}</svg>`;
+    case 'curl':
+    case 'extension':
+      return `<svg class="ex-icon anim-${pattern}" viewBox="0 0 100 100">
+        ${HEAD}${TORSO}${LEGS}
+        <line class="ex-body" x1="50" y1="28" x2="36" y2="46"/>
+        <line class="ex-body ex-forearm" x1="36" y1="46" x2="32" y2="62"/>
+      </svg>`;
+    case 'core':
+      return `<svg class="ex-icon anim-core" viewBox="0 0 100 100">
+        <g class="ex-figure">
+          <circle class="ex-head" cx="20" cy="55" r="7"/>
+          <line class="ex-body" x1="27" y1="55" x2="75" y2="58"/>
+          <line class="ex-body" x1="25" y1="62" x2="25" y2="78"/>
+          <line class="ex-body" x1="75" y1="58" x2="90" y2="75"/>
+        </g>
+      </svg>`;
+    case 'cardio':
+      return `<svg class="ex-icon anim-cardio" viewBox="0 0 100 100">
+        <circle class="ex-head" cx="54" cy="20" r="7"/>
+        <line class="ex-body" x1="50" y1="24" x2="54" y2="58"/>
+        <line class="ex-body ex-leg-l" x1="52" y1="58" x2="40" y2="90"/>
+        <line class="ex-body ex-leg-r" x1="52" y1="58" x2="64" y2="90"/>
+        <line class="ex-body ex-arm-l" x1="54" y1="30" x2="40" y2="48"/>
+        <line class="ex-body ex-arm-r" x1="54" y1="30" x2="68" y2="48"/>
+      </svg>`;
+    default:
+      return `<svg class="ex-icon" viewBox="0 0 100 100">${HEAD}${TORSO}${LEGS}${ARMS}</svg>`;
+  }
+}
+
 /* ---------------- State ---------------- */
 
 function defaultState() {
-  return { profile: null, weightLog: [], workoutLog: [], dietLog: {}, activeDayKey: null };
+  return { profile: null, weightLog: [], workoutLog: [], dietLog: {}, activeWeekday: null };
 }
 
 function loadState() {
@@ -187,6 +302,14 @@ function fmtDate(d) {
 
 function todayStr() {
   return fmtDate(new Date());
+}
+
+function todayWeekday() {
+  return WEEKDAYS_BY_INDEX[new Date().getDay()];
+}
+
+function activeWeekday() {
+  return state.activeWeekday || todayWeekday();
 }
 
 function isThisWeek(dateStr) {
@@ -266,16 +389,11 @@ function latestWeight() {
   return state.weightLog[state.weightLog.length - 1].weightKg;
 }
 
-function nextDayKey() {
-  if (!state.workoutLog.length) return 'A';
-  const last = state.workoutLog[state.workoutLog.length - 1].dayKey;
-  const idx = DAY_CYCLE.indexOf(last);
-  return DAY_CYCLE[(idx + 1) % DAY_CYCLE.length];
-}
-
 function lastExercisePerformance(name) {
   for (let i = state.workoutLog.length - 1; i >= 0; i--) {
-    const ex = state.workoutLog[i].exercises.find((e) => e.name === name);
+    const s = state.workoutLog[i];
+    if (!s.exercises) continue;
+    const ex = s.exercises.find((e) => e.name === name);
     if (ex) return ex.sets;
   }
   return null;
@@ -314,21 +432,60 @@ function meterRow(label, value, target, unit) {
     </div>`;
 }
 
+function levelUpNudgeHtml() {
+  const p = state.profile;
+  if (p.experience === 'advanced') return '';
+  const count = state.workoutLog.length;
+  const threshold = p.experience === 'beginner' ? 12 : 24;
+  if (count < threshold) return '';
+  const next = p.experience === 'beginner' ? 'Intermediate' : 'Advanced';
+  return `<div class="card nudge"><p style="margin:0;">\u{1F4A1} You’ve logged ${count} sessions on ${p.experience}. Feeling strong? Try bumping to <b>${next}</b> in Settings.</p></div>`;
+}
+
 /* ---------------- Rendering: Dashboard ---------------- */
 
 function renderDashboard() {
   const p = state.profile;
   const targets = calcTargets(p);
   const totals = dietTotalsForDate(todayStr());
-  const dayKey = nextDayKey();
-  const template = WORKOUT_TEMPLATES[p.experience][dayKey];
+  const wd = todayWeekday();
+  const muscle = WEEKDAY_MUSCLE[wd];
   const currentWeight = latestWeight();
+
+  let workoutCard;
+  if (muscle === 'rest') {
+    workoutCard = `
+      <div class="card">
+        <h3>Today — Rest Day</h3>
+        <p class="muted">Recovery day. A light walk or stretching is fine, but no lifting scheduled.</p>
+      </div>`;
+  } else if (muscle === 'cardio') {
+    const list = CARDIO_TEMPLATES[p.experience];
+    workoutCard = `
+      <div class="card">
+        <div class="row"><h3 style="margin:0;">Today — Cardio</h3><button class="btn-secondary" data-action="go-workout">Start</button></div>
+        <ul style="padding-left:18px; margin:10px 0 0;">
+          ${list.map((a) => `<li>${escapeHtml(a.activity)} — ${a.duration}</li>`).join('')}
+        </ul>
+      </div>`;
+  } else {
+    const list = STRENGTH_TEMPLATES[muscle][p.experience];
+    workoutCard = `
+      <div class="card">
+        <div class="row"><h3 style="margin:0;">Today — ${MUSCLE_LABELS[muscle]}</h3><button class="btn-secondary" data-action="go-workout">Start</button></div>
+        <ul style="padding-left:18px; margin:10px 0 0;">
+          ${list.map((ex) => `<li>${escapeHtml(ex.name)} — ${ex.sets}×${ex.reps}</li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
   return `
     <div class="card">
       <h2 style="margin-bottom:4px;">Hi ${escapeHtml(p.name)} 👋</h2>
       <p class="muted" style="margin:0 0 4px;">${new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       <p class="tiny" style="margin:0;">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''}</p>
     </div>
+    ${levelUpNudgeHtml()}
     <div class="card">
       <h3>Today's targets</h3>
       ${meterRow('Calories', totals.cal, targets.calories, 'kcal')}
@@ -337,24 +494,44 @@ function renderDashboard() {
       ${meterRow('Fat', totals.fat, targets.fat, 'g')}
       <p class="tiny" style="margin-top:10px;margin-bottom:0;">TDEE ≈ ${targets.tdee} kcal/day</p>
     </div>
-    <div class="card">
-      <div class="row"><h3 style="margin:0;">Next workout — Day ${dayKey}</h3><button class="btn-secondary" data-action="go-workout">Start</button></div>
-      <ul style="padding-left:18px; margin:10px 0 0;">
-        ${template.map((ex) => `<li>${escapeHtml(ex.name)} — ${ex.sets}×${ex.reps}</li>`).join('')}
-      </ul>
-    </div>
+    ${workoutCard}
   `;
 }
 
 /* ---------------- Rendering: Workout ---------------- */
 
 function renderWorkout() {
+  const wd = activeWeekday();
+  const muscle = WEEKDAY_MUSCLE[wd];
+  const chips = WEEKDAYS_ORDERED.map(
+    (k) => `<button class="chip ${k === wd ? 'active' : ''}" data-action="pick-weekday" data-weekday="${k}">${WEEKDAY_SHORT[k]}</button>`
+  ).join('');
+
+  let body;
+  if (muscle === 'rest') {
+    body = `<div class="card"><h3>${WEEKDAY_LABELS[wd]} — Rest Day</h3><p class="muted">No lifting scheduled. Recovery: light walk, stretching, foam rolling, or just rest.</p></div>`;
+  } else if (muscle === 'cardio') {
+    body = renderCardioDay(wd);
+  } else {
+    body = renderStrengthDay(wd, muscle);
+  }
+
+  return `
+    <div class="card">
+      <h3 style="margin:0;">${WEEKDAY_LABELS[wd]} — ${MUSCLE_LABELS[muscle]}</h3>
+      <div class="chip-row">${chips}</div>
+    </div>
+    ${body}
+    <div class="card">
+      <h3>History</h3>
+      ${workoutHistoryHtml()}
+    </div>
+  `;
+}
+
+function renderStrengthDay(wd, muscle) {
   const p = state.profile;
-  const dayKey = state.activeDayKey || nextDayKey();
-  const template = WORKOUT_TEMPLATES[p.experience][dayKey];
-  const chips = DAY_CYCLE.map(
-    (k) => `<button class="chip ${k === dayKey ? 'active' : ''}" data-action="pick-day" data-day="${k}">Day ${k}</button>`
-  ).join(' ');
+  const template = STRENGTH_TEMPLATES[muscle][p.experience];
   const exercisesHtml = template
     .map((ex, exIdx) => {
       const last = lastExercisePerformance(ex.name);
@@ -375,24 +552,52 @@ function renderWorkout() {
       const lastSummary = last ? ' · last: ' + last.map((s) => `${s.weight || 0}×${s.reps || 0}`).join(', ') : '';
       return `
       <div class="exercise">
-        <div class="exercise-name">${escapeHtml(ex.name)}</div>
-        <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
+        <div class="row" style="align-items:flex-start;gap:10px;">
+          ${exIconSVG(ex.pattern)}
+          <div style="flex:1;">
+            <div class="exercise-name">${escapeHtml(ex.name)}</div>
+            <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
+            <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)}</div>
+          </div>
+        </div>
         ${setsHtml}
       </div>`;
     })
     .join('');
   return `
     <div class="card">
-      <div class="row"><h3 style="margin:0;">Workout — Day ${dayKey}</h3></div>
-      <div style="margin:10px 0;">${chips}</div>
       ${exercisesHtml}
-      <button class="btn-primary" style="margin-top:12px;" data-action="save-workout" data-daykey="${dayKey}">Save workout</button>
-    </div>
+      <button class="btn-primary" style="margin-top:12px;" data-action="save-workout" data-weekday="${wd}" data-muscle="${muscle}">Save workout</button>
+    </div>`;
+}
+
+function renderCardioDay(wd) {
+  const p = state.profile;
+  const list = CARDIO_TEMPLATES[p.experience];
+  const itemsHtml = list
+    .map(
+      (a, i) => `
+    <div class="exercise">
+      <div class="row" style="align-items:flex-start;gap:10px;">
+        ${exIconSVG('cardio')}
+        <div style="flex:1;">
+          <div class="exercise-name">${escapeHtml(a.activity)}</div>
+          <div class="tiny">Target: ${a.duration}</div>
+          <div class="tiny" style="margin-top:2px;">${escapeHtml(a.cue)}</div>
+        </div>
+      </div>
+      <div class="set-row" style="grid-template-columns:1fr auto;">
+        <input type="number" inputmode="numeric" placeholder="minutes done" data-cardio="${i}" />
+        <span></span>
+      </div>
+    </div>`
+    )
+    .join('');
+  return `
     <div class="card">
-      <h3>History</h3>
-      ${workoutHistoryHtml()}
-    </div>
-  `;
+      ${itemsHtml}
+      <button class="btn-primary" style="margin-top:12px;" data-action="save-cardio" data-weekday="${wd}">Save session</button>
+    </div>`;
 }
 
 function workoutHistoryHtml() {
@@ -401,14 +606,22 @@ function workoutHistoryHtml() {
     .reverse()
     .slice(0, 10)
     .map((s) => {
-      const totalSets = s.exercises.reduce((n, e) => n + e.sets.length, 0);
-      return `<div class="log-entry"><span>${s.date} · Day ${s.dayKey}</span><span class="tiny">${s.exercises.length} exercises, ${totalSets} sets</span></div>`;
+      const label = MUSCLE_LABELS[s.muscle] || s.muscle || '';
+      let detail = '';
+      if (s.exercises) {
+        const totalSets = s.exercises.reduce((n, e) => n + e.sets.length, 0);
+        detail = `${s.exercises.length} exercises, ${totalSets} sets`;
+      } else if (s.activities) {
+        const totalMin = s.activities.reduce((n, a) => n + a.minutes, 0);
+        detail = `${totalMin} min`;
+      }
+      return `<div class="log-entry"><span>${s.date} · ${label}</span><span class="tiny">${detail}</span></div>`;
     })
     .join('');
 }
 
-function saveWorkout(dayKey) {
-  const template = WORKOUT_TEMPLATES[state.profile.experience][dayKey];
+function saveWorkout(weekday, muscle) {
+  const template = STRENGTH_TEMPLATES[muscle][state.profile.experience];
   const exercises = template
     .map((ex, exIdx) => {
       const sets = [];
@@ -426,10 +639,30 @@ function saveWorkout(dayKey) {
     toast('Log at least one set first');
     return;
   }
-  state.workoutLog.push({ date: todayStr(), dayKey, exercises });
-  state.activeDayKey = null;
+  state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises });
+  state.activeWeekday = null;
   saveState();
   toast('Workout saved 💪');
+  render();
+}
+
+function saveCardio(weekday) {
+  const list = CARDIO_TEMPLATES[state.profile.experience];
+  const activities = list
+    .map((a, i) => {
+      const el = document.querySelector(`[data-cardio="${i}"]`);
+      const minutes = el && el.value ? Number(el.value) : 0;
+      return { activity: a.activity, minutes };
+    })
+    .filter((a) => a.minutes > 0);
+  if (!activities.length) {
+    toast('Log at least one activity');
+    return;
+  }
+  state.workoutLog.push({ date: todayStr(), weekday, muscle: 'cardio', activities });
+  state.activeWeekday = null;
+  saveState();
+  toast('Cardio logged 🏃');
   render();
 }
 
@@ -658,7 +891,7 @@ function renderProgress() {
     </div>
     <div class="card">
       <h3>Consistency</h3>
-      <p style="margin:0 0 4px;">${weekCount} / ${state.profile.daysPerWeek} workouts logged this week</p>
+      <p style="margin:0 0 4px;">${weekCount} / 6 scheduled sessions logged this week</p>
       <p class="tiny" style="margin:0;">${state.workoutLog.length} total sessions logged all-time</p>
     </div>
   `;
@@ -710,9 +943,7 @@ function renderSettings() {
         <label>Experience<select name="experience">
           ${['beginner', 'intermediate', 'advanced'].map((v) => `<option value="${v}" ${p.experience === v ? 'selected' : ''}>${v}</option>`).join('')}
         </select></label>
-        <label>Days per week<select name="daysPerWeek">
-          ${[3, 4, 5, 6].map((v) => `<option value="${v}" ${p.daysPerWeek === v ? 'selected' : ''}>${v} days</option>`).join('')}
-        </select></label>
+        <p class="tiny">Weekly split (fixed): Mon Chest · Tue Back · Wed Shoulders · Thu Arms · Fri Cardio · Sat Legs · Sun Rest.</p>
         <button type="submit" class="btn-primary">Save changes</button>
       </form>
     </div>
@@ -745,7 +976,6 @@ function saveSettingsForm(form) {
     goal: fd.get('goal'),
     diet: fd.get('diet'),
     experience: fd.get('experience'),
-    daysPerWeek: Number(fd.get('daysPerWeek')),
   };
   saveState();
   toast('Saved');
@@ -802,11 +1032,13 @@ function handleAppClick(e) {
   if (action === 'go-workout') {
     currentTab = 'workout';
     render();
-  } else if (action === 'pick-day') {
-    state.activeDayKey = btn.dataset.day;
+  } else if (action === 'pick-weekday') {
+    state.activeWeekday = btn.dataset.weekday;
     render();
   } else if (action === 'save-workout') {
-    saveWorkout(btn.dataset.daykey);
+    saveWorkout(btn.dataset.weekday, btn.dataset.muscle);
+  } else if (action === 'save-cardio') {
+    saveCardio(btn.dataset.weekday);
   } else if (action === 'add-food') {
     addFoodByName(btn.dataset.name);
   } else if (action === 'remove-food') {
@@ -883,7 +1115,6 @@ function handleOnboardingSubmit(e) {
     goal: fd.get('goal'),
     diet: fd.get('diet'),
     experience: fd.get('experience'),
-    daysPerWeek: Number(fd.get('daysPerWeek')),
   };
   state.weightLog.push({ date: todayStr(), weightKg: state.profile.weightKg });
   saveState();

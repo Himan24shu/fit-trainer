@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fittrainer-v1';
+const CACHE_NAME = 'fittrainer-v2';
 const ASSETS = [
   './',
   './index.html',
