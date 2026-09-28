@@ -311,6 +311,7 @@ function defaultState() {
     measurementLog: [],
     lastBackupAt: null,
     readinessLog: [],
+    waterLog: [],
   };
 }
 
@@ -458,6 +459,73 @@ function getDisplayTemplate(muscle, experience) {
   return getStrengthTemplate(muscle, experience).map((ex, i) => sessionSwaps[`${muscle}:${i}`] || ex);
 }
 
+/* Rest timer: lives outside #app on purpose, so it survives tab re-renders
+   without wiping in-progress set inputs — pure DOM + setInterval, no
+   saveState/render involved. */
+let restTimerInterval = null;
+let restTimerSeconds = 0;
+
+function updateRestTimerUI() {
+  const label = document.getElementById('restTimerLabel');
+  if (label) label.textContent = Math.max(restTimerSeconds, 0);
+}
+
+function startRestTimer(seconds) {
+  clearInterval(restTimerInterval);
+  restTimerSeconds = seconds;
+  updateRestTimerUI();
+  document.getElementById('restTimer').classList.remove('hidden');
+  restTimerInterval = setInterval(() => {
+    restTimerSeconds--;
+    updateRestTimerUI();
+    if (restTimerSeconds <= 0) {
+      clearInterval(restTimerInterval);
+      toast('Rest done — next set 💪');
+      if (navigator.vibrate) navigator.vibrate(200);
+      setTimeout(() => document.getElementById('restTimer').classList.add('hidden'), 2000);
+    }
+  }, 1000);
+}
+
+function adjustRestTimer(delta) {
+  restTimerSeconds = Math.max(0, restTimerSeconds + delta);
+  updateRestTimerUI();
+}
+
+function stopRestTimer() {
+  clearInterval(restTimerInterval);
+  document.getElementById('restTimer').classList.add('hidden');
+}
+
+function warmupSuggestion(targetWeight) {
+  if (!targetWeight || targetWeight < 15) return null;
+  const round = (n) => Math.round(n / 2.5) * 2.5;
+  return [
+    { weight: round(targetWeight * 0.5), reps: 8 },
+    { weight: round(targetWeight * 0.75), reps: 5 },
+  ];
+}
+
+let workoutStartTimes = {};
+
+function waterTargetMl(p) {
+  return Math.round((p.weightKg * 35) / 250) * 250;
+}
+
+function todayWaterMl() {
+  const entry = state.waterLog.find((w) => w.date === todayStr());
+  return entry ? entry.ml : 0;
+}
+
+function addWater(ml) {
+  const date = todayStr();
+  const entry = state.waterLog.find((w) => w.date === date);
+  if (entry) entry.ml = Math.max(0, entry.ml + ml);
+  else state.waterLog.push({ date, ml: Math.max(0, ml) });
+  saveState();
+  render();
+}
+
 function inferPattern(name) {
   const n = name.toLowerCase();
   if (/curl/.test(n)) return 'curl';
@@ -545,9 +613,9 @@ function calcStreak() {
 
 /* ---------------- Rendering: shared bits ---------------- */
 
-function meterRow(label, value, target, unit) {
+function meterRow(label, value, target, unit, warnOnOver = true) {
   const pct = target > 0 ? Math.min((value / target) * 100, 100) : 0;
-  const over = target > 0 && value > target * 1.1;
+  const over = warnOnOver && target > 0 && value > target * 1.1;
   return `
     <div style="margin-bottom:10px;">
       <div class="row"><span>${label}</span><span class="tiny">${Math.round(value)} / ${Math.round(target)} ${unit}</span></div>
@@ -775,6 +843,7 @@ function renderWorkout() {
 
 function renderStrengthDay(wd, muscle) {
   const p = state.profile;
+  if (!workoutStartTimes[muscle]) workoutStartTimes[muscle] = Date.now();
   const template = getDisplayTemplate(muscle, p.experience);
   const exercisesHtml = template
     .map((ex, exIdx) => {
@@ -798,6 +867,10 @@ function renderStrengthDay(wd, muscle) {
       const suggestionHtml = suggestion
         ? `<div class="tiny" style="margin-top:2px;color:var(--series-1);">💡 ${suggestion.note} — try ${suggestion.weight}kg × ${suggestion.reps}</div>`
         : '';
+      const warmup = suggestion ? warmupSuggestion(suggestion.weight) : null;
+      const warmupHtml = warmup
+        ? `<div class="tiny" style="margin-top:2px;">🔥 Warm-up: ${warmup.map((w) => `${w.weight}kg×${w.reps}`).join(', ')}</div>`
+        : '';
       return `
       <div class="exercise">
         <div class="row" style="align-items:flex-start;gap:10px;">
@@ -808,9 +881,11 @@ function renderStrengthDay(wd, muscle) {
               <span style="flex-shrink:0;white-space:nowrap;">
                 <button type="button" class="link-btn" data-action="voice-log" data-ex="${exIdx}">🎤</button>
                 <button type="button" class="link-btn" data-action="swap-exercise" data-muscle="${muscle}" data-idx="${exIdx}" data-name="${escapeHtml(ex.name)}">🔄 Swap</button>
+                <button type="button" class="link-btn" data-action="start-rest">⏱ Rest</button>
               </span>
             </div>
             <div class="tiny">Target: ${ex.sets} × ${ex.reps}${lastSummary}</div>
+            ${warmupHtml}
             <div class="tiny" style="margin-top:2px;">${escapeHtml(ex.cue)} · <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ex.name + ' exercise form')}" target="_blank" rel="noopener" style="color:var(--series-1);">▶ How to</a></div>
             ${suggestionHtml}
           </div>
@@ -955,7 +1030,7 @@ function workoutHistoryHtml() {
       let detail = '';
       if (s.exercises) {
         const totalSets = s.exercises.reduce((n, e) => n + e.sets.length, 0);
-        detail = `${s.exercises.length} exercises, ${totalSets} sets`;
+        detail = `${s.exercises.length} exercises, ${totalSets} sets${s.durationMin ? ` · ${s.durationMin} min` : ''}`;
       } else if (s.activities) {
         const totalMin = s.activities.reduce((n, a) => n + a.minutes, 0);
         detail = `${totalMin} min`;
@@ -993,7 +1068,9 @@ function saveWorkout(weekday, muscle) {
       prs.push({ date: todayStr(), exercise: ex.name, weight: todayMax });
     }
   });
-  state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises: allExercises });
+  const durationMin = workoutStartTimes[muscle] ? Math.max(1, Math.round((Date.now() - workoutStartTimes[muscle]) / 60000)) : null;
+  delete workoutStartTimes[muscle];
+  state.workoutLog.push({ date: todayStr(), weekday, muscle, exercises: allExercises, durationMin });
   state.prLog.push(...prs);
   state.activeWeekday = null;
   Object.keys(sessionSwaps).forEach((key) => {
@@ -1068,6 +1145,14 @@ function renderDiet() {
       ${meterRow('Protein', totals.protein, targets.protein, 'g')}
       ${meterRow('Carbs', totals.carbs, targets.carbs, 'g')}
       ${meterRow('Fat', totals.fat, targets.fat, 'g')}
+    </div>
+    <div class="card">
+      <h3>Water</h3>
+      ${meterRow('Water', todayWaterMl(), waterTargetMl(p), 'ml', false)}
+      <div class="row" style="gap:8px;margin-top:8px;">
+        <button class="btn-secondary" style="width:auto;" data-action="add-water" data-ml="250">+ Glass (250ml)</button>
+        <button class="btn-secondary" style="width:auto;" data-action="add-water" data-ml="-250">− Undo</button>
+      </div>
     </div>
     <div class="card">
       <h3>Protein trend (14 days)</h3>
@@ -1926,6 +2011,10 @@ function handleAppClick(e) {
     saveState();
     toast('Session deleted');
     render();
+  } else if (action === 'start-rest') {
+    startRestTimer(90);
+  } else if (action === 'add-water') {
+    addWater(Number(btn.dataset.ml));
   } else if (action === 'voice-log') {
     startVoiceLog(Number(btn.dataset.ex));
   } else if (action === 'log-readiness') {
@@ -2059,6 +2148,13 @@ function init() {
   });
 
   document.getElementById('onboardingForm').addEventListener('submit', handleOnboardingSubmit);
+
+  document.getElementById('restTimer').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    if (btn.dataset.action === 'rest-adjust') adjustRestTimer(Number(btn.dataset.delta));
+    else if (btn.dataset.action === 'rest-stop') stopRestTimer();
+  });
 
   document.getElementById('aiFab').addEventListener('click', openAiSheet);
   document.getElementById('aiCloseBtn').addEventListener('click', () => {

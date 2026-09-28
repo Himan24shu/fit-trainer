@@ -325,4 +325,34 @@ svg.chart .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dashar
 .ai-msg.user { align-self: flex-end; background: var(--series-1); color: #fff; }
 .ai-msg.assistant { align-self: flex-start; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); }
 .ai-msg.pending { opacity: 0.6; }
+
+/* ---- Rest timer ---- */
+.rest-timer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--text-primary);
+  color: var(--surface-1);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(11, 11, 11, 0.3);
+  z-index: 60;
+}
+.rest-timer.hidden { display: none; }
+.rest-timer button {
+  background: rgba(255, 255, 255, 0.15);
+  color: inherit;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .link-btn { background: none; border: none; color: var(--series-1); font-weight: 600; cursor: pointer; padding: 0; font-family: inherit; font-size: 14px; }
