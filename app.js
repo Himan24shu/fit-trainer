@@ -180,6 +180,10 @@ const FOOD_DB = [
   { name: 'Mixed veg sabzi', unit: '1 cup', cal: 120, protein: 3, carbs: 15, fat: 6 },
   { name: 'Paneer', unit: '100g', cal: 265, protein: 18, carbs: 1.2, fat: 20 },
   { name: 'Banana', unit: '1', cal: 105, protein: 1.3, carbs: 27, fat: 0.4 },
+  { name: 'Roasted chana (chickpeas)', unit: '30g', cal: 120, protein: 6, carbs: 18, fat: 2 },
+  { name: 'Green tea', unit: '1 cup', cal: 2, protein: 0, carbs: 0.5, fat: 0 },
+  { name: 'Buttermilk / chaas', unit: '1 glass (250ml)', cal: 40, protein: 2, carbs: 4, fat: 1.5 },
+  { name: 'Peanuts', unit: '30g', cal: 170, protein: 7, carbs: 6, fat: 14 },
 ];
 
 const EATING_OUT_PRESETS = [
@@ -1167,7 +1171,7 @@ function saveCardio(weekday) {
 
 function foodResultsHtml(query) {
   const q = (query || '').trim().toLowerCase();
-  const list = q ? FOOD_DB.filter((f) => f.name.toLowerCase().includes(q)) : FOOD_DB.slice(0, 8);
+  const list = q ? FOOD_DB.filter((f) => f.name.toLowerCase().includes(q)) : FOOD_DB;
   if (!list.length) return '<p class="tiny">No matches.</p>';
   return list
     .map(
