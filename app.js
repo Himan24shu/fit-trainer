@@ -799,6 +799,108 @@ function todaysQuote() {
   return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
 }
 
+/* Synthesizes every signal already tracked — workout consistency, diet
+   logging, protein hit-rate, weight trend vs the user's actual goal, recent
+   PRs/deloads — into one plain-language verdict instead of leaving the user
+   to piece together what a dozen separate numbers mean. Only speaks to a
+   dimension when there's real logged data behind it. */
+function weeklyAssessment() {
+  const p = state.profile;
+  const good = [];
+  const bad = [];
+  const neutral = [];
+
+  const weekCount = state.workoutLog.filter((s) => isThisWeek(s.date)).length;
+  if (weekCount === 0) bad.push('No workouts logged yet this week');
+  else if (weekCount >= 5) good.push(`${weekCount}/6 sessions logged this week`);
+  else if (weekCount >= 3) neutral.push(`${weekCount}/6 sessions logged this week`);
+  else bad.push(`Only ${weekCount}/6 sessions logged this week`);
+
+  const targets = calcTargets(p);
+  let daysLogged = 0;
+  let proteinHitDays = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const ds = fmtDate(d);
+    if (state.dietLog[ds] && state.dietLog[ds].length) {
+      daysLogged++;
+      if (dietTotalsForDate(ds).protein >= targets.protein * 0.85) proteinHitDays++;
+    }
+  }
+  if (daysLogged === 0) {
+    bad.push("Haven't logged any meals this week");
+  } else {
+    if (daysLogged >= 5) good.push(`Food logged on ${daysLogged}/7 days`);
+    else neutral.push(`Food logged on ${daysLogged}/7 days`);
+    if (proteinHitDays >= Math.ceil(daysLogged * 0.7)) good.push(`Protein target hit on ${proteinHitDays}/${daysLogged} logged days`);
+    else bad.push(`Protein target only hit on ${proteinHitDays}/${daysLogged} logged days`);
+  }
+
+  const entries = [...state.weightLog].sort((a, b) => a.date.localeCompare(b.date));
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const recent = entries.filter((e) => new Date(e.date) >= twoWeeksAgo);
+  if (recent.length >= 2) {
+    const change = recent[recent.length - 1].weightKg - recent[0].weightKg;
+    if (p.goal === 'muscle_gain') {
+      if (change > 0.2) good.push(`Weight trending up (+${change.toFixed(1)}kg over ~2 weeks) — matches your muscle gain goal`);
+      else if (change < -0.2) bad.push(`Weight trending down (${change.toFixed(1)}kg) while your goal is muscle gain — might need more food`);
+      else neutral.push('Weight has been flat the last couple weeks');
+    } else if (p.goal === 'fat_loss') {
+      if (change < -0.2) good.push(`Weight trending down (${change.toFixed(1)}kg over ~2 weeks) — matches your fat loss goal`);
+      else if (change > 0.2) bad.push(`Weight trending up (+${change.toFixed(1)}kg) while your goal is fat loss`);
+      else neutral.push('Weight has been flat the last couple weeks');
+    } else {
+      neutral.push(`Weight change over ~2 weeks: ${change > 0 ? '+' : ''}${change.toFixed(1)}kg`);
+    }
+  }
+
+  const lastPr = state.prLog.length ? state.prLog[state.prLog.length - 1] : null;
+  if (lastPr && isThisWeek(lastPr.date)) good.push(`New PR this week: ${lastPr.exercise} at ${lastPr.weight}kg`);
+  const deload = deloadSignal();
+  if (deload) bad.push(`${MUSCLE_LABELS[deload.muscle]} volume dropped ${deload.drop}% last session`);
+
+  if (!good.length && !bad.length && !neutral.length) {
+    return { verdict: 'Not enough data yet', emoji: '📊', good, bad, neutral };
+  }
+  let verdict, emoji;
+  if (bad.length === 0 && good.length > 0) {
+    verdict = "You're on track";
+    emoji = '💪';
+  } else if (bad.length === 0) {
+    verdict = 'Doing okay, nothing alarming';
+    emoji = '🙂';
+  } else if (bad.length <= good.length) {
+    verdict = 'Doing okay, a few things to tighten up';
+    emoji = '🙂';
+  } else {
+    verdict = 'Needs attention this week';
+    emoji = '⚠️';
+  }
+  return { verdict, emoji, good, bad, neutral };
+}
+
+function assessmentHtml() {
+  const a = weeklyAssessment();
+  const items = [
+    ...a.good.map((t) => ['good', t]),
+    ...a.neutral.map((t) => ['neutral', t]),
+    ...a.bad.map((t) => ['bad', t]),
+  ];
+  const colors = { good: 'var(--good)', bad: 'var(--critical)', neutral: 'var(--text-secondary)' };
+  const marks = { good: '✓', bad: '✕', neutral: '•' };
+  return `
+    <div class="card">
+      <h3 style="margin-bottom:8px;">${a.emoji} ${a.verdict}</h3>
+      ${
+        items.length
+          ? items.map(([kind, text]) => `<p class="tiny" style="margin:4px 0;color:${colors[kind]};">${marks[kind]} ${escapeHtml(text)}</p>`).join('')
+          : '<p class="tiny">Log a few workouts and meals to get your first assessment.</p>'
+      }
+    </div>`;
+}
+
 function renderDashboard() {
   const p = state.profile;
   const targets = calcTargets(p);
@@ -843,6 +945,7 @@ function renderDashboard() {
       <p class="hero-quote">"${escapeHtml(todaysQuote())}"</p>
       <p class="hero-meta">Goal: ${GOAL_LABELS[p.goal]}${currentWeight ? ' · ' + currentWeight + ' kg' : ''} · ${weeklyCheckinText()}</p>
     </div>
+    ${assessmentHtml()}
     ${readinessCheckinHtml()}
     ${readinessTipHtml()}
     ${scheduleNudgeHtml()}
