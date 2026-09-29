@@ -1733,7 +1733,7 @@ function renderSettings() {
       </div>
       ${
         state.aiMode === 'local'
-          ? `<p class="tiny" style="margin-top:8px;">Runs a small AI model directly in your phone's browser — completely free, no account ever. Downloads once (~600-900MB) then works offline. It's weaker than Gemini and needs a browser with WebGPU (recent Chrome on Android; often unavailable on older phones or iOS Safari). It reliably handles simple commands — log weight, change goal/experience/diet, log cardio minutes, switch screens — plus general chat, but for logging specific foods with accurate macros, Gemini does much better.</p>`
+          ? `<p class="tiny" style="margin-top:8px;">Runs a very small AI model directly in your phone's browser — completely free, no account ever. Downloads once (~300-400MB) then works offline. It's noticeably weaker than Gemini and needs a browser with WebGPU (recent Chrome on Android; often unavailable on older phones or iOS Safari) — some phones' graphics drivers can't reliably run it at all. It reliably handles simple commands — log weight, change goal/experience/diet, log cardio minutes, switch screens — plus general chat, but for logging specific foods with accurate macros, Gemini does much better.</p>`
           : `<p class="tiny" style="margin-top:8px;">Free via Google's Gemini API. Get a free key at <b>aistudio.google.com/apikey</b> (sign in, then copy the key shown or tap "Create API key" — no credit card needed), paste it below, then tap the chat bubble on any screen. It's stored only on this device and sent only to Google when you actually send a message — never anywhere else.</p>
       <form id="aiKeyForm">
         <input type="password" name="geminiKey" placeholder="Paste your Gemini API key" value="${escapeHtml(getGeminiKey())}" />
@@ -2067,7 +2067,13 @@ async function callAssistant(userText, history) {
    macros) falls through to the small model as plain conversation, with an honest
    nudge toward the Gemini option for that case. */
 
-const LOCAL_MODEL_ID = 'Llama-3.2-1B-Instruct-q4f16_1-MLC';
+/* SmolLM2-360M over the initially-tried Llama-3.2-1B: a real user hit
+   "failed to execute mapAsync on GPU buffer, buffer was unmapped" on their
+   phone — a low-level WebGPU memory-pressure failure, not an app bug —
+   which a model needing well under half the GPU memory is far less likely
+   to trigger. Quality drops further with the smaller model; that trade is
+   worth it if it means it actually runs at all on a mid-range phone. */
+const LOCAL_MODEL_ID = 'SmolLM2-360M-Instruct-q4f16_1-MLC';
 const LOCAL_AI_SYSTEM_PROMPT =
   'You are a friendly fitness assistant inside the FitTrainer app. Give short, practical answers about workouts, diet, and fitness in 2-3 sentences.';
 
@@ -2120,17 +2126,27 @@ async function callLocalAssistant(userText, history) {
     };
   }
   if (!localEngine) {
-    const proceed = confirm('This downloads a small AI model (~600-900MB) to your phone once, then works fully offline with no sign-up. Continue?');
+    const proceed = confirm('This downloads a small AI model (~300-400MB) to your phone once, then works fully offline with no sign-up. Continue?');
     if (!proceed) {
       return { text: 'No problem — try again anytime, or switch to the free Gemini option in Settings.' };
     }
   }
-  const engine = await ensureLocalEngine();
-  const historyMsgs = history.slice(-6).map((h) => ({ role: h.type === 'user_input' ? 'user' : 'assistant', content: h.content }));
-  const messages = [{ role: 'system', content: LOCAL_AI_SYSTEM_PROMPT }, ...historyMsgs, { role: 'user', content: userText }];
-  const response = await engine.chat.completions.create({ messages, temperature: 0.7, max_tokens: 200 });
-  const reply = (response.choices[0] && response.choices[0].message.content) || "Sorry, I didn't catch that — try rephrasing?";
-  return { text: reply };
+  try {
+    const engine = await ensureLocalEngine();
+    const historyMsgs = history.slice(-6).map((h) => ({ role: h.type === 'user_input' ? 'user' : 'assistant', content: h.content }));
+    const messages = [{ role: 'system', content: LOCAL_AI_SYSTEM_PROMPT }, ...historyMsgs, { role: 'user', content: userText }];
+    const response = await engine.chat.completions.create({ messages, temperature: 0.7, max_tokens: 200 });
+    const reply = (response.choices[0] && response.choices[0].message.content) || "Sorry, I didn't catch that — try rephrasing?";
+    return { text: reply };
+  } catch (err) {
+    localEngine = null;
+    if (/gpu|buffer|webgpu/i.test(err.message || '')) {
+      return {
+        text: "Your phone's graphics driver couldn't keep running the on-device AI (a low-level GPU memory issue, not something in the app). This phone may just not support it reliably — switch to the free Gemini option in Settings instead.",
+      };
+    }
+    throw err;
+  }
 }
 
 let aiHistory = [];
